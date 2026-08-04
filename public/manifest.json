@@ -1,0 +1,14 @@
+{
+  "name": "Lane 5",
+  "short_name": "Lane 5",
+  "description": "El parte diario del grupo",
+  "start_url": "/hoy",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A2A33",
+  "theme_color": "#0A2A33",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

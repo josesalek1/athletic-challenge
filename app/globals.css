@@ -1,0 +1,209 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+/* ------------------------------------------------------------
+   Paleta: azulejo de piscina bajo el agua.
+   Nada de negro puro; el fondo es agua honda, no vacío.
+   ------------------------------------------------------------ */
+:root {
+  --deep:   #0A2A33;  /* fondo */
+  --tile:   #123C47;  /* tarjetas */
+  --line:   #1D5464;  /* bordes */
+  --chalk:  #EFF4F3;  /* texto */
+  --mist:   #8AA6AC;  /* texto secundario */
+  --rope:   #E4572E;  /* acento cálido: la marca del día */
+  --water:  #35B8C6;  /* acento frío: progreso, activo */
+
+  --display: 'Archivo Black', system-ui, sans-serif;
+  --body:    'Inter', system-ui, sans-serif;
+  --data:    'DM Mono', ui-monospace, monospace;
+
+  --r: 14px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--deep);
+  color: var(--chalk);
+  font-family: var(--body);
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: 76px; /* hueco para la barra inferior */
+}
+
+/* Tipografía ------------------------------------------------ */
+.display {
+  font-family: var(--display);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+}
+.eyebrow {
+  font-family: var(--data);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mist);
+}
+.num { font-family: var(--data); font-variant-numeric: tabular-nums; }
+
+/* Estructura ------------------------------------------------ */
+.wrap { max-width: 640px; margin: 0 auto; padding: 24px 18px 8px; }
+
+.card {
+  background: var(--tile);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 18px;
+  margin-bottom: 14px;
+}
+
+.row { display: flex; align-items: center; gap: 12px; }
+.between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+
+/* Controles ------------------------------------------------- */
+button, .btn {
+  font-family: var(--body);
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--deep);
+  background: var(--chalk);
+  border: none;
+  border-radius: 10px;
+  padding: 13px 18px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-rope  { background: var(--rope);  color: #fff; }
+.btn-water { background: var(--water); color: var(--deep); }
+.btn-ghost {
+  background: transparent;
+  color: var(--chalk);
+  border: 1px solid var(--line);
+}
+
+input, select, textarea {
+  font-family: var(--body);
+  font-size: 16px; /* 16px evita el zoom automático en iOS */
+  width: 100%;
+  background: var(--deep);
+  color: var(--chalk);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
+        text-transform: uppercase; color: var(--mist); display: block; margin-bottom: 6px; }
+
+:focus-visible { outline: 2px solid var(--water); outline-offset: 2px; }
+
+/* Casillas del reto yóguico --------------------------------- */
+.check {
+  display: flex; align-items: center; justify-content: flex-start; gap: 14px;
+  width: 100%; text-align: left;
+  background: var(--deep);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  color: var(--chalk);
+  font-weight: 500;
+}
+.check[data-on='true'] { border-color: var(--water); background: #0E3540; }
+.check-n {
+  font-family: var(--data); font-size: 13px;
+  width: 30px; height: 30px; flex: 0 0 30px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  color: var(--mist);
+}
+.check[data-on='true'] .check-n {
+  background: var(--water); border-color: var(--water); color: var(--deep);
+}
+.check-body { flex: 1; min-width: 0; }
+.check-hint { font-size: 12px; color: var(--mist); font-weight: 400; display: block; margin-top: 2px; }
+.check-mark {
+  font-family: var(--data); font-size: 11px; color: var(--mist);
+  flex: 0 0 auto; margin-left: 10px;
+}
+.check[data-on='true'] .check-mark { color: var(--water); }
+
+/* Selector de secciones */
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 16px; }
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  font-family: var(--data); font-size: 11px; letter-spacing: 0.1em;
+  text-transform: uppercase; white-space: nowrap;
+  background: transparent; color: var(--mist);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 9px 14px;
+}
+.chip[data-on='true'] { border-color: var(--chalk); color: var(--chalk); }
+.chip[data-logged='true']::after { content: ' ·'; color: var(--water); }
+
+/* Leyenda del tablero */
+.legend { display: flex; gap: 16px; justify-content: center; padding: 4px 0 14px; }
+.legend span { font-family: var(--data); font-size: 10px; letter-spacing: 0.08em;
+               text-transform: uppercase; color: var(--mist);
+               display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+/* Barras dentro de cada celda del día */
+.bars { display: flex; gap: 2px; justify-content: center; align-items: flex-end; height: 26px; }
+.bar { width: 4px; border-radius: 2px; background: var(--line); height: 40%; }
+.bar[data-on='true'] { height: 100%; }
+.bar[data-cat='yogic'][data-on='true']       { background: var(--water); }
+.bar[data-cat='traditional'][data-on='true'] { background: var(--rope); }
+
+/* Tablero de la semana -------------------------------------- */
+.board { width: 100%; border-collapse: collapse; }
+.board th {
+  font-family: var(--data); font-size: 10px; font-weight: 400;
+  letter-spacing: 0.1em; color: var(--mist); text-transform: uppercase;
+  padding-bottom: 8px;
+}
+.board td { padding: 5px 3px; text-align: center; }
+.board .who {
+  text-align: left; font-weight: 600; font-size: 14px;
+  white-space: nowrap; padding-right: 8px;
+}
+.pip {
+  width: 100%; aspect-ratio: 1; max-width: 32px; margin: 0 auto;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  display: grid; place-items: center;
+  font-family: var(--data); font-size: 12px; color: var(--mist);
+}
+.pip[data-fill='full']  { background: var(--water); border-color: var(--water); color: var(--deep); }
+.pip[data-fill='part']  { background: #17505E; border-color: var(--water); color: var(--chalk); }
+.pip[data-fill='today'] { border-color: var(--rope); border-style: dashed; }
+
+/* Barra inferior -------------------------------------------- */
+.tabs {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  background: #08222A;
+  border-top: 1px solid var(--line);
+  padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+  z-index: 50;
+}
+.tab {
+  font-family: var(--data); font-size: 10px; letter-spacing: 0.1em;
+  text-transform: uppercase; text-align: center;
+  color: var(--mist); text-decoration: none;
+  padding: 6px 0;
+}
+.tab[data-active='true'] { color: var(--water); }
+.tab span { display: block; font-size: 17px; margin-bottom: 3px; }
+
+.muted { color: var(--mist); font-size: 13px; line-height: 1.5; }
+.empty { text-align: center; padding: 32px 18px; color: var(--mist); font-size: 14px; line-height: 1.6; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
