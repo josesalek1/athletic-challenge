@@ -1,5 +1,6 @@
 node_modules
 .next
 .env.local
+supabase/functions/.env
 .DS_Store
 *.tsbuildinfo
