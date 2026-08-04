@@ -37,7 +37,7 @@ export default function Checklist({
         <p className="eyebrow">{challenge.name}</p>
         <p className="num" style={{ fontSize: 12,
              color: done.length >= goal ? 'var(--water)' : 'var(--mist)' }}>
-          {done.length}/{goal} today
+          {done.length} selected · goal {goal}
         </p>
       </div>
       {challenge.config.blurb && (
