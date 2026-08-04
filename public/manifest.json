@@ -1,6 +1,6 @@
 {
-  "name": "Lane 5",
-  "short_name": "Lane 5",
+  "name": "Athletic Challenge",
+  "short_name": "Athletic Challenge",
   "description": "El parte diario del grupo",
   "start_url": "/hoy",
   "display": "standalone",

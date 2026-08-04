@@ -21,15 +21,15 @@ export default async function Videos() {
 
   return (
     <main className="wrap">
-      <p className="eyebrow">Del entrenador</p>
-      <h1 className="display" style={{ fontSize: 36, margin: '8px 0 20px' }}>Ejercicios</h1>
+      <p className="eyebrow">From the coach</p>
+      <h1 className="display" style={{ fontSize: 36, margin: '8px 0 20px' }}>Exercises</h1>
 
       {videos.length === 0 ? (
         <p className="empty">
-          Todavía no hay vídeos.
+          There are no videos yet.
           <br />
-          Súbelos a YouTube como <strong>no listados</strong> y pega el enlace en la tabla{' '}
-          <code>videos</code> de Supabase.
+          Upload them to YouTube as <strong>unlisted</strong> and paste the link into the{' '}
+          <code>videos</code> table in Supabase.
         </p>
       ) : (
         videos.map((v) => {
@@ -50,7 +50,7 @@ export default async function Videos() {
               ) : (
                 <a className="btn btn-ghost" style={{ width: '100%' }} href={v.url}
                    target="_blank" rel="noopener noreferrer">
-                  Abrir el vídeo
+                  Open video
                 </a>
               )}
             </div>

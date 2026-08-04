@@ -34,7 +34,7 @@ export default function Login() {
     <main className="wrap" style={{ paddingTop: 72 }}>
       <p className="eyebrow">Desde diciembre de 2025</p>
       <h1 className="display" style={{ fontSize: 46, margin: '10px 0 8px' }}>
-        Lane 5
+        Athletic Challenge
       </h1>
       <p className="muted" style={{ marginBottom: 30 }}>
         El parte diario de los cinco. Entra con tu correo — no hay contraseña.

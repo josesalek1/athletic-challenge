@@ -2,10 +2,10 @@ import './globals.css';
 import type { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Lane 5',
+  title: 'Athletic Challenge',
   description: 'El parte diario del grupo',
   manifest: '/manifest.json',
-  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Lane 5' },
+  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Athletic Challenge' },
 };
 
 export const viewport: Viewport = {
