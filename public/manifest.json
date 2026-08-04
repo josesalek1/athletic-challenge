@@ -1,8 +1,10 @@
 {
   "name": "Athletic Challenge",
   "short_name": "Athletic Challenge",
-  "description": "El parte diario del grupo",
+  "description": "Your group’s daily athletic challenge",
+  "id": "/",
   "start_url": "/hoy",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0A2A33",

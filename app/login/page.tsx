@@ -35,8 +35,8 @@ export default function Login() {
       setState('error');
       setMessage(
         mode === 'register'
-          ? 'No se pudo completar el registro. Revisa tu nombre y el código interno.'
-          : 'No se pudo enviar el enlace. Revisa el correo e inténtalo otra vez.'
+          ? 'Registration failed. Check your name and group code.'
+          : 'The sign-in link could not be sent. Check your email and try again.'
       );
       return;
     }
@@ -45,20 +45,21 @@ export default function Login() {
 
   return (
     <main className="wrap" style={{ paddingTop: 72 }}>
-      <p className="eyebrow">Desde diciembre de 2025</p>
+      <p className="eyebrow">Since December 2025</p>
       <h1 className="display" style={{ fontSize: 46, margin: '10px 0 8px' }}>
         Athletic Challenge
       </h1>
       <p className="muted" style={{ marginBottom: 30 }}>
-        El reto diario del grupo. Entra con tu correo — no hay contraseña.
+        Your group’s daily challenge. Sign in with your email — no password needed.
       </p>
 
       {state === 'sent' ? (
         <div className="card">
-          <p style={{ fontWeight: 600, marginBottom: 6 }}>Enlace enviado</p>
+          <p style={{ fontWeight: 600, marginBottom: 6 }}>Check your inbox</p>
           <p className="muted">
-            Abre el correo en <strong>este mismo teléfono</strong> y pulsa el enlace.
-            Caduca en una hora.
+            Open the email on <strong>this same device</strong> and tap the sign-in link.
+            It expires in one hour. Once signed in, install or open Athletic Challenge
+            from that same browser. Your session will stay active for daily use.
           </p>
         </div>
       ) : (
@@ -69,26 +70,26 @@ export default function Login() {
                       setMode('login');
                       setState('idle');
                     }}>
-              Entrar
+              Sign in
             </button>
             <button className="chip" role="tab" data-on={mode === 'register'}
                     aria-selected={mode === 'register'} onClick={() => {
                       setMode('register');
                       setState('idle');
                     }}>
-              Registrarme
+              Register
             </button>
           </div>
 
           {mode === 'register' && (
             <>
-              <label htmlFor="display-name">Tu nombre</label>
+              <label htmlFor="display-name">Your name</label>
               <input
                 id="display-name"
                 type="text"
                 autoComplete="name"
                 value={displayName}
-                placeholder="Nombre y apellido"
+                placeholder="First and last name"
                 maxLength={50}
                 onChange={(e) => setDisplayName(e.target.value)}
               />
@@ -96,7 +97,7 @@ export default function Login() {
           )}
 
           <label htmlFor="email" style={{ marginTop: mode === 'register' ? 14 : 0 }}>
-            Tu correo
+            Your email
           </label>
           <input
             id="email"
@@ -104,20 +105,20 @@ export default function Login() {
             inputMode="email"
             autoComplete="email"
             value={email}
-            placeholder="tu@correo.com"
+            placeholder="you@email.com"
             onChange={(e) => setEmail(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && ready && send()}
           />
 
           {mode === 'register' && (
             <>
-              <label htmlFor="invite-code" style={{ marginTop: 14 }}>Código interno</label>
+              <label htmlFor="invite-code" style={{ marginTop: 14 }}>Group code</label>
               <input
                 id="invite-code"
                 type="text"
                 autoComplete="off"
                 value={inviteCode}
-                placeholder="Código del grupo"
+                placeholder="Private group code"
                 onChange={(e) => setInviteCode(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && ready && send()}
               />
@@ -131,8 +132,8 @@ export default function Login() {
             onClick={send}
           >
             {state === 'sending'
-              ? 'Enviando…'
-              : mode === 'register' ? 'Registrarme y enviar enlace' : 'Enviarme el enlace'}
+              ? 'Sending…'
+              : mode === 'register' ? 'Register and send link' : 'Send me a sign-in link'}
           </button>
           {state === 'error' && (
             <p className="muted" style={{ marginTop: 12, color: 'var(--rope)' }}>{message}</p>
