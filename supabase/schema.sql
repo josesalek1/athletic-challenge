@@ -17,11 +17,7 @@ create table if not exists allowed_emails (
 
 -- >>> CAMBIA ESTOS 5 CORREOS ANTES DE EJECUTAR <<<
 insert into allowed_emails (email, display_name) values
-  ('tu@correo.com',      'Tú'),
-  ('marco@correo.com',   'Marco'),
-  ('amigo3@correo.com',  'Amigo 3'),
-  ('amigo4@correo.com',  'Amigo 4'),
-  ('amigo5@correo.com',  'Amigo 5')
+  ('CHANGE_ME@example.com', 'Admin')
 on conflict (email) do nothing;
 
 -- ------------------------------------------------------------
