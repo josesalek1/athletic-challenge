@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
 type Feedback = { tone: 'success' | 'error'; text: string } | null;
@@ -162,6 +163,21 @@ export default function ProfileSettings({
         </div>
       </section>
 
+      {role === 'admin' && (
+        <section className="settings-section">
+          <p className="eyebrow">Administration</p>
+          <div className="card admin-entry-card">
+            <div>
+              <p style={{ fontWeight: 600 }}>Manage Athletic Challenge</p>
+              <p className="muted" style={{ marginTop: 4 }}>
+                Members, challenges, videos and the registration code.
+              </p>
+            </div>
+            <Link className="btn btn-water" href="/admin">Open admin panel</Link>
+          </div>
+        </section>
+      )}
+
       <section className="settings-section">
         <p className="eyebrow">Sessions</p>
         <div className="card danger-card">
@@ -185,4 +201,3 @@ export default function ProfileSettings({
     </main>
   );
 }
-

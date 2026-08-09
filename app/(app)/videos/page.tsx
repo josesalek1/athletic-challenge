@@ -28,8 +28,7 @@ export default async function Videos() {
         <p className="empty">
           There are no videos yet.
           <br />
-          Upload them to YouTube as <strong>unlisted</strong> and paste the link into the{' '}
-          <code>videos</code> table in Supabase.
+          An administrator can add them from <strong>More → Manage Athletic Challenge</strong>.
         </p>
       ) : (
         videos.map((v) => {
