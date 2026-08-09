@@ -1,4 +1,5 @@
 import type { Challenge, Payload } from './types';
+import { validChecklistDone } from './checklist';
 import { mmss } from './format';
 
 // The only place where the group message is composed.
@@ -18,15 +19,16 @@ export function dayLine(
     }
     if (challenge.kind === 'checklist' && payload.done?.length) {
       const items = challenge.config.items ?? [];
-      const count = `${payload.done.length}/${items.length}`;
+      const done = validChecklistDone(challenge, payload.done);
+      const count = `${done.length}/${items.length}`;
 
       if (challenge.config.share === 'count') {
-        return payload.done.length === items.length
+        return done.length === items.length
           ? `${challenge.name} ✓`
           : `${challenge.name} ${count}`;
       }
 
-      const names = payload.done
+      const names = done
         .map((k) => items.find((i) => i.key === k))
         .filter(Boolean)
         .sort((a, b) => a!.n - b!.n)

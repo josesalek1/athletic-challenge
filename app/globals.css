@@ -27,7 +27,7 @@ body {
   color: var(--chalk);
   font-family: var(--body);
   -webkit-font-smoothing: antialiased;
-  padding-bottom: 76px; /* hueco para la barra inferior */
+  padding-bottom: calc(76px + env(safe-area-inset-bottom));
 }
 
 /* Tipografía ------------------------------------------------ */
@@ -47,7 +47,11 @@ body {
 .num { font-family: var(--data); font-variant-numeric: tabular-nums; }
 
 /* Estructura ------------------------------------------------ */
-.wrap { max-width: 640px; margin: 0 auto; padding: 24px 18px 8px; }
+.wrap {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: calc(24px + env(safe-area-inset-top)) 18px 8px;
+}
 
 .card {
   background: var(--tile);
@@ -101,6 +105,19 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
         text-transform: uppercase; color: var(--mist); display: block; margin-bottom: 6px; }
 
 :focus-visible { outline: 2px solid var(--water); outline-offset: 2px; }
+
+/* Selector nativo: en iPhone se abre como rueda táctil. */
+.rep-picker-wrap { max-width: 260px; margin: 22px auto 4px; text-align: center; }
+.rep-picker {
+  height: 76px;
+  padding: 8px 44px 8px 18px;
+  border-color: var(--water);
+  font-size: 36px;
+  font-weight: 600;
+  text-align: center;
+  text-align-last: center;
+}
+.rep-picker-wrap .muted { margin-top: 8px; }
 
 /* Casillas del reto yóguico --------------------------------- */
 .check {
@@ -183,6 +200,108 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 .pip[data-fill='part']  { background: #17505E; border-color: var(--water); color: var(--chalk); }
 .pip[data-fill='today'] { border-color: var(--rope); border-style: dashed; }
 
+/* Leaderboard adaptable: nunca necesita desplazamiento horizontal. */
+.week-page { max-width: 720px; }
+.week-heading { align-items: flex-end; margin: 8px 0 18px; }
+.week-heading h1 { font-size: clamp(32px, 9vw, 46px); }
+.range-label { color: var(--water); font-size: 12px; white-space: nowrap; }
+.range-picker {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.range-option {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  padding: 10px 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--mist);
+  font-family: var(--data);
+  font-size: 11px;
+  text-decoration: none;
+}
+.range-option[data-on='true'] {
+  border-color: var(--water);
+  background: #0E3540;
+  color: var(--chalk);
+}
+.leaderboard-list { display: grid; gap: 12px; }
+.leader-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--tile);
+}
+.leader-summary { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.leader-rank {
+  display: grid;
+  place-items: center;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--mist);
+  font-size: 12px;
+}
+.leader-card:first-child .leader-rank {
+  border-color: var(--rope);
+  background: var(--rope);
+  color: white;
+}
+.leader-person { flex: 1; min-width: 0; }
+.leader-person h2 {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.leader-person .muted { margin-top: 2px; font-size: 11px; }
+.leader-score { color: var(--water); font-size: 20px; }
+.progress-chart {
+  display: grid;
+  align-items: end;
+  gap: clamp(1px, 0.5vw, 3px);
+  height: 48px;
+  margin-top: 14px;
+  padding-top: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.progress-chart i {
+  width: 100%;
+  min-height: 3px;
+  border-radius: 2px 2px 0 0;
+  background: var(--water);
+  opacity: 0.28;
+}
+.progress-chart i[style*='100%'] { opacity: 1; }
+.progress-chart i[data-today='true'] { background: var(--rope); opacity: 1; }
+.chart-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+  color: var(--mist);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+.week-note { padding: 16px 8px 10px; text-align: center; }
+
+.movement-guide { margin: 10px 0 14px; }
+.movement-guide summary {
+  color: var(--water);
+  cursor: pointer;
+  font-family: var(--data);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.movement-guide p { margin-top: 8px; }
+
 /* Barra inferior -------------------------------------------- */
 .tabs {
   position: fixed; bottom: 0; left: 0; right: 0;
@@ -206,4 +325,12 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
+}
+
+@media (max-width: 390px) {
+  .wrap { padding-left: 14px; padding-right: 14px; }
+  .card { padding: 15px; }
+  .leader-card { padding: 14px; }
+  .leader-person .muted { font-size: 10px; }
+  .leader-score { font-size: 18px; }
 }

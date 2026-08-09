@@ -1,113 +1,160 @@
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { lastNDays, dowOf, today } from '@/lib/format';
+import { lastNDays, today } from '@/lib/format';
+import { validChecklistDone } from '@/lib/checklist';
 import type { Challenge, Entry } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-/* Cada día es una pila de barras: una por reto.
-   Cian = yóguico, naranja = tradicional, apagada = sin hacer. */
+const RANGES = [7, 14, 30, 60, 90] as const;
+type Range = (typeof RANGES)[number];
 
-function met(entry: Entry | undefined, ch: Challenge) {
+function met(entry: Entry | undefined, challenge: Challenge) {
   if (!entry) return false;
-  const p = entry.payload;
-  if (ch.kind === 'checklist') return (p.done?.length ?? 0) >= (ch.config.daily_goal ?? 3);
-  if (ch.kind === 'timed') return (p.seconds ?? 0) >= (ch.config.target_s ?? 1);
-  if (ch.kind === 'reps') return (p.reps ?? 0) >= (ch.config.target ?? 1);
-  if (ch.kind === 'done') return Boolean(p.ok);
-  return false;
+  const payload = entry.payload;
+  if (challenge.kind === 'checklist') {
+    return validChecklistDone(challenge, payload.done).length >=
+      (challenge.config.daily_goal ?? 3);
+  }
+  if (challenge.kind === 'timed') {
+    return (payload.seconds ?? 0) >= (challenge.config.target_s ?? 1);
+  }
+  if (challenge.kind === 'reps') {
+    return (payload.reps ?? 0) >= (challenge.config.target ?? 1);
+  }
+  return Boolean(payload.ok);
+}
+function shortDate(iso: string) {
+  return new Date(`${iso}T12:00:00`).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+  });
 }
 
-export default async function Semana() {
+export default async function Week({
+  searchParams,
+}: {
+  searchParams: Promise<{ days?: string }>;
+}) {
+  const requested = Number((await searchParams).days);
+  const range: Range = RANGES.includes(requested as Range) ? requested as Range : 7;
+  const allDays = lastNDays(90);
+  const days = allDays.slice(-range);
+  const currentDay = today();
   const supabase = await createClient();
-  const days = lastNDays(7);
-  const hoy = today();
 
   const [{ data: profiles }, { data: entries }, { data: challenges }] = await Promise.all([
     supabase.from('profiles').select('id, display_name').order('display_name'),
-    supabase.from('entries').select('*').gte('day', days[0]),
+    supabase.from('entries').select('*').gte('day', allDays[0]),
     supabase.from('challenges').select('*').eq('active', true).order('sort_order'),
   ]);
 
   const active = (challenges ?? []) as Challenge[];
-  const rows = profiles ?? [];
   const all = (entries ?? []) as Entry[];
-
   const byKey = new Map<string, Entry>();
-  all.forEach((e) => byKey.set(`${e.user_id}|${e.day}|${e.challenge_id}`, e));
+  all.forEach((entry) => {
+    byKey.set(`${entry.user_id}|${entry.day}|${entry.challenge_id}`, entry);
+  });
 
-  function streak(userId: string) {
-    let n = 0;
-    for (let i = 0; i < 90; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const off = d.getTimezoneOffset() * 60000;
-      const iso = new Date(d.getTime() - off).toISOString().slice(0, 10);
-      const any = all.some((e) => e.user_id === userId && e.day === iso);
-      if (any) n++;
-      else if (i > 0) break;
-    }
-    return n;
+  function challengesForDay(day: string) {
+    return active.filter((challenge) => !challenge.started_on || challenge.started_on <= day);
   }
 
-  return (
-    <main className="wrap">
-      <p className="eyebrow">Last 7 days</p>
-      <h1 className="display" style={{ fontSize: 36, margin: '8px 0 14px' }}>The board</h1>
+  function dayProgress(userId: string, day: string) {
+    const available = challengesForDay(day);
+    if (!available.length) return { met: 0, total: 0, percent: 0 };
+    const completed = available.filter((challenge) =>
+      met(byKey.get(`${userId}|${day}|${challenge.id}`), challenge)
+    ).length;
+    return {
+      met: completed,
+      total: available.length,
+      percent: Math.round((completed / available.length) * 100),
+    };
+  }
 
-      <div className="legend">
-        <span><i style={{ background: 'var(--water)' }} />Yogic</span>
-        <span><i style={{ background: 'var(--rope)' }} />Traditional</span>
-        <span><i style={{ background: 'var(--line)' }} />Not done</span>
+  function streak(userId: string) {
+    let count = 0;
+    for (let index = allDays.length - 1; index >= 0; index--) {
+      const day = allDays[index];
+      const hasEntry = all.some((entry) => entry.user_id === userId && entry.day === day);
+      if (hasEntry) count++;
+      else if (day !== currentDay) break;
+    }
+    return count;
+  }
+
+  const leaderboard = (profiles ?? []).map((profile) => {
+    const timeline = days.map((day) => dayProgress(profile.id, day));
+    const completed = timeline.reduce((sum, item) => sum + item.met, 0);
+    const possible = timeline.reduce((sum, item) => sum + item.total, 0);
+    return {
+      ...profile,
+      timeline,
+      completed,
+      possible,
+      percent: possible ? Math.round((completed / possible) * 100) : 0,
+      streak: streak(profile.id),
+    };
+  }).sort((a, b) =>
+    b.percent - a.percent || b.streak - a.streak || a.display_name.localeCompare(b.display_name)
+  );
+
+  return (
+    <main className="wrap week-page">
+      <p className="eyebrow">Group progress</p>
+      <div className="between week-heading">
+        <h1 className="display">Leaderboard</h1>
+        <span className="range-label num">{range} days</span>
       </div>
 
-      {rows.length === 0 ? (
-        <p className="empty">
-          Nobody in yet.
-          <br />
-          Add the emails to <code>allowed_emails</code> and share the link.
-        </p>
+      <nav className="range-picker" aria-label="Leaderboard period">
+        {RANGES.map((value) => (
+          <Link key={value} href={`/semana?days=${value}`}
+                className="range-option" data-on={range === value}>
+            {value}
+          </Link>
+        ))}
+      </nav>
+
+      {leaderboard.length === 0 ? (
+        <p className="empty">Nobody has joined the group yet.</p>
       ) : (
-        <div className="card">
-          <table className="board">
-            <thead>
-              <tr>
-                <th className="who"></th>
-                {days.map((d) => <th key={d}>{dowOf(d)}</th>)}
-                <th>🔥</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((p) => (
-                <tr key={p.id}>
-                  <td className="who">{p.display_name}</td>
-                  {days.map((d) => (
-                    <td key={d}>
-                      <div className="bars"
-                           title={`${p.display_name} · ${d}`}
-                           style={d === hoy ? { opacity: 0.95 } : undefined}>
-                        {active.map((c) => {
-                          const e = byKey.get(`${p.id}|${d}|${c.id}`);
-                          return (
-                            <i key={c.id} className="bar"
-                               data-cat={c.category}
-                               data-on={met(e, c)} />
-                          );
-                        })}
-                      </div>
-                    </td>
-                  ))}
-                  <td className="num" style={{ fontSize: 13, color: 'var(--rope)' }}>
-                    {streak(p.id)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="leaderboard-list">
+          {leaderboard.map((person, index) => (
+            <article className="leader-card" key={person.id}>
+              <div className="leader-summary">
+                <span className="leader-rank num">{index + 1}</span>
+                <div className="leader-person">
+                  <h2>{person.display_name}</h2>
+                  <p className="muted">
+                    {person.completed}/{person.possible} goals · {person.streak} day streak
+                  </p>
+                </div>
+                <strong className="leader-score num">{person.percent}%</strong>
+              </div>
+
+              <div className="progress-chart"
+                   style={{ gridTemplateColumns: `repeat(${range}, minmax(0, 1fr))` }}
+                   aria-label={`${person.display_name}: ${person.percent}% completion`}>
+                {person.timeline.map((item, dayIndex) => (
+                  <i key={days[dayIndex]}
+                     title={`${shortDate(days[dayIndex])}: ${item.met}/${item.total}`}
+                     data-today={days[dayIndex] === currentDay}
+                     style={{ height: `${item.percent ? Math.max(item.percent, 12) : 7}%` }} />
+                ))}
+              </div>
+              <div className="chart-axis num">
+                <span>{shortDate(days[0])}</span>
+                <span>Today</span>
+              </div>
+            </article>
+          ))}
         </div>
       )}
 
-      <p className="muted" style={{ textAlign: 'center', paddingBottom: 10 }}>
-        One bar per challenge, in the same order as the tabs. Full height means the goal was met.
+      <p className="muted week-note">
+        Each bar is one day. Height shows the share of daily goals completed.
       </p>
     </main>
   );

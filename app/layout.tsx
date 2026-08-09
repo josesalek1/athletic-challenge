@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: 'Athletic Challenge',
   description: 'El parte diario del grupo',
   manifest: '/manifest.json',
-  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Athletic Challenge' },
+  appleWebApp: { capable: true, statusBarStyle: 'black', title: 'Athletic Challenge' },
 };
 
 export const viewport: Viewport = {
@@ -17,7 +17,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es">
+    <html lang="en">
       <body>{children}</body>
     </html>
   );

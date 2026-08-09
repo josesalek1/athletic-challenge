@@ -16,6 +16,7 @@ export default function RepsCounter({
   const [reps, setReps] = useState(initialReps);
   const [saved, setSaved] = useState(initialReps);
   const [saving, setSaving] = useState(false);
+  const options = Array.from({ length: 201 }, (_, value) => value);
 
   async function save() {
     setSaving(true);
@@ -37,14 +38,19 @@ export default function RepsCounter({
         <p className="muted" style={{ marginBottom: 14 }}>{challenge.config.blurb}</p>
       )}
 
-      <div className="row" style={{ justifyContent: 'center', gap: 22, marginTop: 4 }}>
-        <button className="btn-ghost" style={{ width: 54, height: 54, fontSize: 22 }}
-                onClick={() => setReps((r) => Math.max(0, r - 1))} aria-label="One less">−</button>
-        <span className="num display" style={{ fontSize: 52, minWidth: 90, textAlign: 'center' }}>
-          {reps}
-        </span>
-        <button className="btn-ghost" style={{ width: 54, height: 54, fontSize: 22 }}
-                onClick={() => setReps((r) => r + 1)} aria-label="One more">+</button>
+      <div className="rep-picker-wrap">
+        <label htmlFor={`reps-${challenge.id}`}>Repetitions completed</label>
+        <select
+          id={`reps-${challenge.id}`}
+          className="rep-picker num"
+          value={reps}
+          onChange={(event) => setReps(Number(event.target.value))}
+        >
+          {options.map((value) => (
+            <option key={value} value={value}>{value}</option>
+          ))}
+        </select>
+        <p className="muted">Tap the number and scroll the wheel.</p>
       </div>
 
       <button className="btn-rope" style={{ width: '100%', marginTop: 16 }}

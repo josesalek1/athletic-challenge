@@ -169,7 +169,11 @@ export default function TrainingDay({
                   {ex.sets} × {ex.reps}{ex.perSide ? '/side' : ''}
                 </p>
               </div>
-              <p className="check-hint" style={{ marginBottom: 12 }}>{ex.cue}</p>
+              <p className="check-hint">{ex.cue}</p>
+              <details className="movement-guide">
+                <summary>How to do it</summary>
+                <p className="muted">{ex.how}</p>
+              </details>
 
               {prev.length > 0 && (
                 <p className="num" style={{ fontSize: 11, color: 'var(--water)', marginBottom: 10 }}>

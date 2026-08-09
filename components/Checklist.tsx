@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { validChecklistDone } from '@/lib/checklist';
 import type { Challenge } from '@/lib/types';
 
 export default function Checklist({
@@ -15,7 +16,9 @@ export default function Checklist({
   const items = challenge.config.items ?? [];
   const goal = challenge.config.daily_goal ?? 3;
 
-  const [done, setDone] = useState<string[]>(initialDone);
+  const [done, setDone] = useState<string[]>(() =>
+    validChecklistDone(challenge, initialDone)
+  );
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -26,7 +29,7 @@ export default function Checklist({
 
   async function save() {
     setSaving(true);
-    await onSave(done);
+    await onSave(validChecklistDone(challenge, done));
     setSaving(false);
     setDirty(false);
   }

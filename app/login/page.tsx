@@ -44,7 +44,7 @@ export default function Login() {
   }
 
   return (
-    <main className="wrap" style={{ paddingTop: 72 }}>
+    <main className="wrap" style={{ paddingTop: 'calc(72px + env(safe-area-inset-top))' }}>
       <p className="eyebrow">Since December 2025</p>
       <h1 className="display" style={{ fontSize: 46, margin: '10px 0 8px' }}>
         Athletic Challenge
