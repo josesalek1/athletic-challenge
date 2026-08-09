@@ -1,29 +1,19 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { lastNDays, today } from '@/lib/format';
-import { validChecklistDone } from '@/lib/checklist';
-import type { Challenge, Entry } from '@/lib/types';
+import type { Challenge } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
 const RANGES = [7, 14, 30, 60, 90] as const;
 type Range = (typeof RANGES)[number];
 
-function met(entry: Entry | undefined, challenge: Challenge) {
-  if (!entry) return false;
-  const payload = entry.payload;
-  if (challenge.kind === 'checklist') {
-    return validChecklistDone(challenge, payload.done).length >=
-      (challenge.config.daily_goal ?? 3);
-  }
-  if (challenge.kind === 'timed') {
-    return (payload.seconds ?? 0) >= (challenge.config.target_s ?? 1);
-  }
-  if (challenge.kind === 'reps') {
-    return (payload.reps ?? 0) >= (challenge.config.target ?? 1);
-  }
-  return Boolean(payload.ok);
-}
+type GroupCheckin = {
+  user_id: string;
+  challenge_id: string;
+  day: string;
+  goal_met: boolean;
+};
 function shortDate(iso: string) {
   return new Date(`${iso}T12:00:00`).toLocaleDateString('en-GB', {
     day: 'numeric',
@@ -43,17 +33,18 @@ export default async function Week({
   const currentDay = today();
   const supabase = await createClient();
 
-  const [{ data: profiles }, { data: entries }, { data: challenges }] = await Promise.all([
+  const [{ data: profiles }, { data: checkins }, { data: challenges }] = await Promise.all([
     supabase.from('profiles').select('id, display_name').order('display_name'),
-    supabase.from('entries').select('*').gte('day', allDays[0]),
+    supabase.from('group_checkins').select('user_id, challenge_id, day, goal_met')
+      .gte('day', allDays[0]),
     supabase.from('challenges').select('*').eq('active', true).order('sort_order'),
   ]);
 
   const active = (challenges ?? []) as Challenge[];
-  const all = (entries ?? []) as Entry[];
-  const byKey = new Map<string, Entry>();
-  all.forEach((entry) => {
-    byKey.set(`${entry.user_id}|${entry.day}|${entry.challenge_id}`, entry);
+  const all = (checkins ?? []) as GroupCheckin[];
+  const byKey = new Map<string, GroupCheckin>();
+  all.forEach((checkin) => {
+    byKey.set(`${checkin.user_id}|${checkin.day}|${checkin.challenge_id}`, checkin);
   });
 
   function challengesForDay(day: string) {
@@ -64,7 +55,7 @@ export default async function Week({
     const available = challengesForDay(day);
     if (!available.length) return { met: 0, total: 0, percent: 0 };
     const completed = available.filter((challenge) =>
-      met(byKey.get(`${userId}|${day}|${challenge.id}`), challenge)
+      byKey.get(`${userId}|${day}|${challenge.id}`)?.goal_met
     ).length;
     return {
       met: completed,
@@ -77,8 +68,8 @@ export default async function Week({
     let count = 0;
     for (let index = allDays.length - 1; index >= 0; index--) {
       const day = allDays[index];
-      const hasEntry = all.some((entry) => entry.user_id === userId && entry.day === day);
-      if (hasEntry) count++;
+      const hasCheckin = all.some((checkin) => checkin.user_id === userId && checkin.day === day);
+      if (hasCheckin) count++;
       else if (day !== currentDay) break;
     }
     return count;
@@ -102,9 +93,9 @@ export default async function Week({
 
   return (
     <main className="wrap week-page">
-      <p className="eyebrow">Group progress</p>
+      <p className="eyebrow">Shared challenge activity</p>
       <div className="between week-heading">
-        <h1 className="display">Leaderboard</h1>
+        <h1 className="display">Group pulse</h1>
         <span className="range-label num">{range} days</span>
       </div>
 
@@ -154,7 +145,7 @@ export default async function Week({
       )}
 
       <p className="muted week-note">
-        Each bar is one day. Height shows the share of daily goals completed.
+        Each bar is one day. Only shared goal completion is shown; exact results stay private.
       </p>
     </main>
   );

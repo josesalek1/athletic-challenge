@@ -5,9 +5,10 @@ import { usePathname } from 'next/navigation';
 
 const TABS = [
   { href: '/hoy',      icon: '◉', label: 'Today' },
-  { href: '/semana',   icon: '▤', label: 'Week' },
+  { href: '/semana',   icon: '▤', label: 'Group' },
   { href: '/training', icon: '≋', label: 'Training' },
   { href: '/videos',   icon: '▶', label: 'Videos' },
+  { href: '/settings', icon: '•••', label: 'More' },
 ];
 
 export default function NavBar() {

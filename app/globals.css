@@ -305,7 +305,7 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 /* Barra inferior -------------------------------------------- */
 .tabs {
   position: fixed; bottom: 0; left: 0; right: 0;
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: grid; grid-template-columns: repeat(5, 1fr);
   background: #08222A;
   border-top: 1px solid var(--line);
   padding: 8px 0 max(8px, env(safe-area-inset-bottom));
@@ -319,6 +319,35 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 }
 .tab[data-active='true'] { color: var(--water); }
 .tab span { display: block; font-size: 17px; margin-bottom: 3px; }
+
+/* Profile and account settings -------------------------------- */
+.settings-section { margin-top: 22px; }
+.settings-section > .eyebrow { margin-bottom: 9px; }
+.settings-field + .settings-field { margin-top: 14px; }
+.settings-value { font-size: 14px; overflow-wrap: anywhere; }
+.settings-actions { display: grid; gap: 10px; margin-top: 14px; }
+.settings-feedback {
+  margin-top: 11px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--deep);
+}
+.settings-feedback[data-tone='success'] { border-color: var(--water); color: var(--water); }
+.settings-feedback[data-tone='error'] { border-color: var(--rope); color: #ff9b7e; }
+.membership-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 9px;
+  border: 1px solid var(--water);
+  border-radius: 999px;
+  color: var(--water);
+  font-family: var(--data);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.danger-card { border-color: color-mix(in srgb, var(--rope) 65%, var(--line)); }
 
 .muted { color: var(--mist); font-size: 13px; line-height: 1.5; }
 .empty { text-align: center; padding: 32px 18px; color: var(--mist); font-size: 14px; line-height: 1.6; }

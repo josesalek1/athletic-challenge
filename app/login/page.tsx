@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 export default function Login() {
@@ -14,6 +14,14 @@ export default function Login() {
     email.trim() &&
     (mode === 'login' || (displayName.trim() && inviteCode.trim()))
   );
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error') === 'account_disabled') {
+      setState('error');
+      setMessage('This account is inactive. Contact the group administrator.');
+    }
+  }, []);
 
   async function send() {
     setState('sending');

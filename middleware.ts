@@ -23,11 +23,26 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
   const isPublic = path.startsWith('/login') || path.startsWith('/auth');
+  let isActive = false;
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from('profiles')
+      .select('active')
+      .eq('id', user.id)
+      .maybeSingle();
+    isActive = Boolean(membership?.active);
+  }
 
   if (!user && !isPublic) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
-  if (user && path === '/login') {
+  if (user && !isActive && !isPublic) {
+    const login = new URL('/login', request.url);
+    login.searchParams.set('error', 'account_disabled');
+    return NextResponse.redirect(login);
+  }
+  if (user && isActive && path === '/login') {
     return NextResponse.redirect(new URL('/hoy', request.url));
   }
 
