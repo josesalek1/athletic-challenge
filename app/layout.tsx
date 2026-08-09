@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = {
   title: 'Athletic Challenge',
-  description: 'El parte diario del grupo',
+  description: 'Daily challenges, private training and shared group consistency.',
   manifest: '/manifest.json',
   appleWebApp: { capable: true, statusBarStyle: 'black', title: 'Athletic Challenge' },
 };

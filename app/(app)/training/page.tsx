@@ -12,6 +12,7 @@ export default async function Training({
 }) {
   const { slot: wanted } = await searchParams;
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
   const day = today();
 
   const weekday = new Date(day + 'T12:00:00').getDay();
@@ -32,6 +33,7 @@ export default async function Training({
       todaySets={todaySets ?? []}
       history={history ?? []}
       done={Boolean(session?.done)}
+      userId={user!.id}
     />
   );
 }

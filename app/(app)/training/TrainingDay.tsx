@@ -1,9 +1,16 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { PLAN, PROGRESSION, type Exercise } from '@/lib/plan';
 import { mmss } from '@/lib/format';
+import {
+  hasQueuedTrainingSession,
+  isNetworkFailure,
+  queueMutation,
+  queuedTrainingSets,
+  removeQueuedMutation,
+} from '@/lib/offline';
 
 type SetRow = {
   id?: string;
@@ -22,12 +29,14 @@ export default function TrainingDay({
   todaySets,
   history,
   done,
+  userId,
 }: {
   slotKey: string;
   day: string;
   todaySets: SetRow[];
   history: SetRow[];
   done: boolean;
+  userId: string;
 }) {
   const supabase = createClient();
   const slot = PLAN.find((s) => s.key === slotKey)!;
@@ -45,6 +54,23 @@ export default function TrainingDay({
   );
   const [finished, setFinished] = useState(done);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const pendingSets = queuedTrainingSets(userId, day, slot.key);
+    if (pendingSets.length) {
+      setSets((current) => ({
+        ...current,
+        ...Object.fromEntries(pendingSets.map((set) => [
+          `${set.exercise_key}:${set.set_index}`,
+          {
+            weight: set.weight_kg != null ? String(set.weight_kg) : '',
+            reps: set.seconds != null ? String(set.seconds) : set.reps != null ? String(set.reps) : '',
+          },
+        ])),
+      }));
+    }
+    if (hasQueuedTrainingSession(userId, day, slot.key)) setFinished(true);
+  }, [day, slot.key, userId]);
 
   // La última vez que hiciste cada ejercicio: la referencia para progresar.
   const lastTime = useMemo(() => {
@@ -74,41 +100,79 @@ export default function TrainingDay({
   async function saveSet(ex: Exercise, i: number) {
     const f = field(ex, i);
     if (!f.reps && !f.weight) return;
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
     const value = Number(f.reps) || null;
+    const mutation = {
+      id: `training_set:${userId}:${day}:${slot.key}:${ex.key}:${i}`,
+      type: 'training_set' as const,
+      user_id: userId,
+      day,
+      slot: slot.key,
+      exercise_key: ex.key,
+      set_index: i,
+      weight_kg: ex.noLoad || !f.weight ? null : Number(f.weight),
+      reps: ex.timed ? null : value,
+      seconds: ex.timed ? value : null,
+    };
 
-    const { error } = await supabase.from('training_sets').upsert(
-      {
-        user_id: user.id,
-        day,
-        slot: slot.key,
-        exercise_key: ex.key,
-        set_index: i,
-        weight_kg: ex.noLoad || !f.weight ? null : Number(f.weight),
-        reps: ex.timed ? null : value,
-        seconds: ex.timed ? value : null,
-      },
-      { onConflict: 'user_id,day,slot,exercise_key,set_index' }
-    );
+    if (!navigator.onLine) {
+      queueMutation(mutation);
+      return;
+    }
 
-    if (error) alert('Could not save that set.');
+    try {
+      const { error } = await supabase.from('training_sets').upsert({
+        user_id: mutation.user_id,
+        day: mutation.day,
+        slot: mutation.slot,
+        exercise_key: mutation.exercise_key,
+        set_index: mutation.set_index,
+        weight_kg: mutation.weight_kg,
+        reps: mutation.reps,
+        seconds: mutation.seconds,
+      }, { onConflict: 'user_id,day,slot,exercise_key,set_index' });
+      if (error) {
+        if (isNetworkFailure(error)) queueMutation(mutation);
+        else alert('Could not save that set.');
+      } else removeQueuedMutation(mutation.id);
+    } catch (error) {
+      if (isNetworkFailure(error)) queueMutation(mutation);
+      else alert('Could not save that set.');
+    }
   }
 
   async function finish() {
     setBusy(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    const mutation = {
+      id: `training_session:${userId}:${day}:${slot.key}`,
+      type: 'training_session' as const,
+      user_id: userId,
+      day,
+      slot: slot.key,
+      done: true,
+    };
 
-    const { error } = await supabase.from('training_sessions').upsert(
-      { user_id: user.id, day, slot: slot.key, done: true },
-      { onConflict: 'user_id,day,slot' }
-    );
+    if (!navigator.onLine) {
+      queueMutation(mutation);
+      setBusy(false);
+      setFinished(true);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('training_sessions').upsert(
+        { user_id: userId, day, slot: slot.key, done: true },
+        { onConflict: 'user_id,day,slot' }
+      );
+      if (error) {
+        if (isNetworkFailure(error)) queueMutation(mutation);
+        else { setBusy(false); alert('Could not close the session.'); return; }
+      } else removeQueuedMutation(mutation.id);
+    } catch (error) {
+      if (isNetworkFailure(error)) queueMutation(mutation);
+      else { setBusy(false); alert('Could not close the session.'); return; }
+    }
 
     setBusy(false);
-    if (error) { alert('Could not close the session.'); return; }
     setFinished(true);
   }
 

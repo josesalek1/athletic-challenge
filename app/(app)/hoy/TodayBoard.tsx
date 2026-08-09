@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import Stopwatch from '@/components/Stopwatch';
 import Checklist from '@/components/Checklist';
@@ -8,23 +8,35 @@ import RepsCounter from '@/components/RepsCounter';
 import DoneToggle from '@/components/DoneToggle';
 import { dayLine, waLink, isLogged } from '@/lib/share';
 import type { Challenge, Entry, Payload } from '@/lib/types';
+import { isNetworkFailure, queueMutation, queuedEntries, removeQueuedMutation } from '@/lib/offline';
 
 export default function TodayBoard({
   challenges,
   entries,
   day,
   name,
+  userId,
 }: {
   challenges: Challenge[];
   entries: Entry[];
   day: string;
   name: string;
+  userId: string;
 }) {
   const supabase = createClient();
   const [local, setLocal] = useState<Record<string, Payload>>(
     Object.fromEntries(entries.map((e) => [e.challenge_id, e.payload]))
   );
   const [section, setSection] = useState(challenges[0]?.id ?? '');
+
+  useEffect(() => {
+    const queued = queuedEntries(userId, day);
+    if (!queued.length) return;
+    setLocal((current) => ({
+      ...current,
+      ...Object.fromEntries(queued.map((item) => [item.challenge_id, item.payload])),
+    }));
+  }, [day, userId]);
 
   // Día N contado desde started_on: igual para todo el grupo,
   // entre quien entre y cuando entre.
@@ -38,21 +50,35 @@ export default function TodayBoard({
   }, [challenges, day]);
 
   async function save(challengeId: string, payload: Payload) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    setLocal((l) => ({ ...l, [challengeId]: payload }));
 
-    const { error } = await supabase
-      .from('entries')
-      .upsert(
-        { user_id: user.id, challenge_id: challengeId, day, payload },
-        { onConflict: 'user_id,challenge_id,day' }
-      );
+    const mutation = {
+      id: `entry:${userId}:${day}:${challengeId}`,
+      type: 'entry' as const,
+      user_id: userId,
+      challenge_id: challengeId,
+      day,
+      payload,
+    };
 
-    if (error) {
-      alert('Could not save. Check your connection and try again.');
+    if (!navigator.onLine) {
+      queueMutation(mutation);
       return;
     }
-    setLocal((l) => ({ ...l, [challengeId]: payload }));
+
+    try {
+      const { error } = await supabase.from('entries').upsert(
+        { user_id: userId, challenge_id: challengeId, day, payload },
+        { onConflict: 'user_id,challenge_id,day' }
+      );
+      if (error) {
+        if (isNetworkFailure(error)) queueMutation(mutation);
+        else alert('Could not save that result. Try again.');
+      } else removeQueuedMutation(mutation.id);
+    } catch (error) {
+      if (isNetworkFailure(error)) queueMutation(mutation);
+      else alert('Could not save that result. Try again.');
+    }
   }
 
   const current = challenges.find((c) => c.id === section);

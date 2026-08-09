@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { clearOfflineData } from '@/lib/offline';
 
 type Feedback = { tone: 'success' | 'error'; text: string } | null;
 
@@ -96,6 +97,7 @@ export default function ProfileSettings({
       setAccountFeedback({ tone: 'error', text: 'Could not sign out. Try again.' });
       return;
     }
+    clearOfflineData();
     window.location.replace('/login');
   }
 

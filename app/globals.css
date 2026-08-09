@@ -585,6 +585,41 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 .admin-create-card > h3 { margin-bottom: 13px; }
 .code-fields { margin-top: 14px; }
 
+/* Offline queue and fallback -------------------------------- */
+.offline-status {
+  position: fixed;
+  right: 12px;
+  bottom: calc(72px + env(safe-area-inset-bottom));
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: calc(100vw - 24px);
+  padding: 8px 11px;
+  border: 1px solid var(--rope);
+  border-radius: 999px;
+  background: #08222A;
+  color: #ffb29b;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.24);
+  font-family: var(--data);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.offline-status[data-online='true'] { border-color: var(--water); color: var(--water); }
+.offline-status span { font-size: 14px; }
+.offline-page { max-width: 520px; padding-top: calc(44px + env(safe-area-inset-top)); }
+.offline-page .display { margin: 9px 0 13px; font-size: clamp(38px, 12vw, 58px); }
+.offline-pending {
+  margin-top: 18px;
+  padding: 11px 13px;
+  border: 1px solid var(--rope);
+  border-radius: 10px;
+  color: #ffb29b;
+  font-size: 12px;
+}
+.offline-actions { display: grid; gap: 10px; margin-top: 22px; }
+
 @media (min-width: 680px) {
   .admin-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-create-card { max-width: 540px; }

@@ -25,6 +25,7 @@ export default async function Hoy() {
       entries={(entries ?? []) as Entry[]}
       day={day}
       name={profile?.display_name ?? ''}
+      userId={user!.id}
     />
   );
 }
