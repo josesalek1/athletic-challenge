@@ -12,6 +12,8 @@ export type MemberAdmin = {
   role: 'member' | 'admin';
   active: boolean;
   created_at: string;
+  last_sign_in_at: string | null;
+  last_activity_at: string | null;
 };
 
 export type VideoAdmin = {

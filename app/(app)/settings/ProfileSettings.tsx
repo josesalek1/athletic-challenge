@@ -97,7 +97,7 @@ export default function ProfileSettings({
       setAccountFeedback({ tone: 'error', text: 'Could not sign out. Try again.' });
       return;
     }
-    clearOfflineData();
+    await clearOfflineData();
     window.location.replace('/login');
   }
 

@@ -435,6 +435,35 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 .group-trend-card { margin-bottom: 24px; }
 .group-trend-card h2 { margin-top: 3px; font-size: 18px; }
 .group-trend-card .insight-title > strong { color: var(--water); font-size: 23px; }
+.challenge-filter { display: flex; gap: 7px; margin: -4px 0 14px; overflow-x: auto; scrollbar-width: none; }
+.challenge-filter::-webkit-scrollbar { display: none; }
+.challenge-filter a { flex: 0 0 auto; padding: 8px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--mist); font: 10px var(--data); text-transform: uppercase; letter-spacing: .08em; }
+.challenge-filter a[data-on='true'] { border-color: var(--water); background: color-mix(in srgb, var(--water) 14%, transparent); color: var(--water); }
+.record-row { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.record-row span { color: var(--mist); font: 10px var(--data); text-transform: uppercase; letter-spacing: .08em; }
+.record-row strong { color: var(--chalk); font-size: 12px; }
+.auto-insight { margin-top: 12px; padding: 11px 12px; border-left: 2px solid var(--water); background: var(--tile); color: var(--chalk); font-size: 12px; line-height: 1.55; }
+.practice-frequency { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.practice-frequency div { padding: 9px; background: var(--tile); }
+.practice-frequency span, .practice-frequency strong { display: block; }
+.practice-frequency span { color: var(--mist); font: 9px var(--data); text-transform: uppercase; }
+.practice-frequency strong { margin-top: 4px; font-size: 11px; }
+.exercise-progress-grid, .ranking-grid { display: grid; gap: 10px; }
+.exercise-progress-card, .ranking-grid article { padding: 14px; border: 1px solid var(--line); background: var(--panel); }
+.exercise-progress-card h3 { font-size: 13px; }
+.exercise-progress-card > .between > span { color: var(--water); font-size: 11px; }
+.celebration-stack { display: grid; gap: 7px; margin-bottom: 13px; }
+.celebration-stack p { padding: 11px 13px; border: 1px solid var(--water); background: color-mix(in srgb, var(--water) 9%, var(--panel)); color: var(--chalk); font-size: 12px; }
+.ranking-grid article span, .ranking-grid article strong, .ranking-grid article small { display: block; }
+.ranking-grid article span { color: var(--mist); font: 9px var(--data); text-transform: uppercase; letter-spacing: .08em; }
+.ranking-grid article strong { margin-top: 6px; color: var(--water); font-size: 15px; }
+.ranking-grid article small { margin-top: 3px; color: var(--mist); font-size: 10px; }
+.group-insight { margin-bottom: 14px; }
+.swim-log-form { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.swim-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 12px; }
+.swim-fields label { display: block; margin-bottom: 5px; color: var(--mist); font: 9px var(--data); text-transform: uppercase; }
+.swim-fields input, .swim-fields select, .swim-fields textarea { width: 100%; }
+.swim-notes { grid-column: 1 / -1; }
 .group-chart { height: 82px; }
 .pulse-row > .between { align-items: flex-start; }
 .pulse-row > .between > div { min-width: 0; }
@@ -451,6 +480,7 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .group-trend-card { padding: 20px; }
+  .exercise-progress-grid, .ranking-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .movement-guide { margin: 10px 0 14px; }
@@ -548,6 +578,16 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 .admin-card-heading > div { min-width: 0; }
 .admin-card h3 { font-size: 15px; }
 .admin-email { overflow: hidden; margin-top: 3px; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.member-activity { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+.member-activity span { color: var(--mist); font: 9px var(--data); text-transform: uppercase; }
+.member-activity strong { display: block; margin-top: 4px; color: var(--chalk); font-size: 10px; text-transform: none; }
+.checklist-admin-field { margin-top: 12px; }
+.challenge-preview { margin-top: 13px; padding: 12px; border: 1px dashed var(--water); background: var(--tile); }
+.challenge-preview span, .challenge-preview strong, .challenge-preview small { display: block; }
+.challenge-preview span { color: var(--water); font: 9px var(--data); text-transform: uppercase; }
+.challenge-preview strong { margin-top: 5px; }
+.challenge-preview small, .challenge-preview p { margin-top: 4px; color: var(--mist); }
+.admin-delete-member { width: 100%; margin-top: -1px; border-top: 0; }
 .status-dot {
   flex: 0 0 auto;
   padding: 5px 8px;
@@ -607,7 +647,9 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 .offline-status[data-online='true'] { border-color: var(--water); color: var(--water); }
+.offline-status[data-error='true'] { border-color: var(--rope); color: var(--rope); }
 .offline-status span { font-size: 14px; }
+.offline-status button { margin-left: 8px; border: 0; background: transparent; color: inherit; font: inherit; text-decoration: underline; }
 .offline-page { max-width: 520px; padding-top: calc(44px + env(safe-area-inset-top)); }
 .offline-page .display { margin: 9px 0 13px; font-size: clamp(38px, 12vw, 58px); }
 .offline-pending {

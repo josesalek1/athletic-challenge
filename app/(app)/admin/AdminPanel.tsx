@@ -12,6 +12,28 @@ function cleanId(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
+function checklistToText(challenge: Challenge) {
+  return (challenge.config.items ?? []).map((item) => `${item.name} | ${item.hint}`).join('\n');
+}
+
+function checklistFromText(value: string) {
+  return value.split('\n').map((line) => line.trim()).filter(Boolean).map((line, index) => {
+    const [namePart, ...hintParts] = line.split('|');
+    const name = namePart.trim();
+    return {
+      n: index + 1,
+      key: cleanId(name) || `practice-${index + 1}`,
+      name,
+      hint: hintParts.join('|').trim(),
+    };
+  });
+}
+
+function friendlyDate(value: string | null) {
+  if (!value) return 'Never';
+  return new Date(value).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 function targetOf(challenge: Challenge) {
   if (challenge.kind === 'timed') return challenge.config.target_s ?? 0;
   if (challenge.kind === 'reps') return challenge.config.target ?? 0;
@@ -19,13 +41,13 @@ function targetOf(challenge: Challenge) {
   return 1;
 }
 
-function challengeConfig(challenge: Challenge, kind: Challenge['kind'], target: number, blurb: string) {
+function challengeConfig(challenge: Challenge, kind: Challenge['kind'], target: number, blurb: string, checklistText?: string) {
   const config: Challenge['config'] = { blurb: blurb.trim() };
   if (kind === 'timed') config.target_s = target;
   if (kind === 'reps') config.target = target;
   if (kind === 'checklist') {
     config.daily_goal = target;
-    config.items = challenge.config.items ?? [];
+    config.items = checklistText == null ? challenge.config.items ?? [] : checklistFromText(checklistText);
   }
   return config;
 }
@@ -45,6 +67,19 @@ function MemberEditor({
   const [active, setActive] = useState(member.active);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
+
+  async function sendAccessLink() {
+    setBusy(true);
+    setFeedback(null);
+    const { error } = await supabase.auth.signInWithOtp({
+      email: member.email,
+      options: { shouldCreateUser: false, emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback` },
+    });
+    setBusy(false);
+    setFeedback(error
+      ? { tone: 'error', text: 'The access link could not be sent.' }
+      : { tone: 'success', text: 'A fresh access link was sent.' });
+  }
 
   async function save() {
     setBusy(true);
@@ -78,7 +113,14 @@ function MemberEditor({
         <div><label htmlFor={`role-${member.id}`}>Role</label><select id={`role-${member.id}`} value={role} disabled={isSelf} onChange={(event) => setRole(event.target.value as MemberAdmin['role'])}><option value="member">Member</option><option value="admin">Admin</option></select></div>
         <label className="admin-toggle"><input type="checkbox" checked={active} disabled={isSelf} onChange={(event) => setActive(event.target.checked)} /><span>Account active</span></label>
       </div>
-      <button className="btn-water admin-save" disabled={busy || name.trim().length < 2} onClick={save}>{busy ? 'Saving…' : 'Save member'}</button>
+      <div className="member-activity">
+        <span>Last activity <strong>{friendlyDate(member.last_activity_at)}</strong></span>
+        <span>Last sign-in <strong>{friendlyDate(member.last_sign_in_at)}</strong></span>
+      </div>
+      <div className="admin-button-row">
+        <button className="btn-water" disabled={busy || name.trim().length < 2} onClick={save}>{busy ? 'Saving…' : 'Save member'}</button>
+        <button className="btn-ghost" disabled={busy} onClick={sendAccessLink}>Send access link</button>
+      </div>
       {feedback && <p className="settings-feedback muted" data-tone={feedback.tone}>{feedback.text}</p>}
     </article>
   );
@@ -94,6 +136,7 @@ function ChallengeEditor({ challenge, onSaved }: { challenge: Challenge; onSaved
   const [sortOrder, setSortOrder] = useState(String(challenge.sort_order));
   const [startedOn, setStartedOn] = useState(challenge.started_on ?? '');
   const [active, setActive] = useState(challenge.active);
+  const [checklistText, setChecklistText] = useState(checklistToText(challenge));
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
 
@@ -106,7 +149,7 @@ function ChallengeEditor({ challenge, onSaved }: { challenge: Challenge; onSaved
       name: name.trim(),
       kind,
       category,
-      config: challengeConfig(challenge, kind, numericTarget, blurb),
+      config: challengeConfig(challenge, kind, numericTarget, blurb, checklistText),
       sort_order: Number(sortOrder) || 0,
       started_on: startedOn,
       active,
@@ -144,7 +187,18 @@ function ChallengeEditor({ challenge, onSaved }: { challenge: Challenge; onSaved
         <label className="admin-toggle"><input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} /><span>Challenge active</span></label>
         <div className="admin-wide"><label>Description</label><textarea rows={3} value={blurb} maxLength={220} onChange={(event) => setBlurb(event.target.value)} /></div>
       </div>
-      {kind === 'checklist' && <p className="muted admin-help">Checklist practices remain unchanged. This screen controls the daily goal.</p>}
+      {kind === 'checklist' && (
+        <div className="admin-wide checklist-admin-field">
+          <label>Practices · one per line, using Name | Hint</label>
+          <textarea rows={Math.max(5, checklistText.split('\n').length)} value={checklistText} onChange={(event) => setChecklistText(event.target.value)} />
+        </div>
+      )}
+      <div className="challenge-preview">
+        <span>Preview</span>
+        <strong>{name || challenge.name}</strong>
+        <small>{kind === 'reps' ? `${target} repetitions` : kind === 'timed' ? `${target} seconds` : kind === 'checklist' ? `${target} of ${checklistFromText(checklistText).length} practices` : 'Done / not done'}</small>
+        {blurb && <p>{blurb}</p>}
+      </div>
       <button className="btn-water admin-save" disabled={busy || !name.trim()} onClick={save}>{busy ? 'Saving…' : 'Save challenge'}</button>
       {feedback && <p className="settings-feedback muted" data-tone={feedback.tone}>{feedback.text}</p>}
     </article>
@@ -216,6 +270,7 @@ export default function AdminPanel({
   const [confirmCode, setConfirmCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
+  const [invite, setInvite] = useState({ name: '', email: '' });
 
   function replaceMember(next: MemberAdmin) { setMembers((items) => items.map((item) => item.id === next.id ? next : item)); }
   function replaceChallenge(next: Challenge) { setChallenges((items) => items.map((item) => item.id === next.id ? next : item).sort((a, b) => a.sort_order - b.sort_order)); }
@@ -231,7 +286,7 @@ export default function AdminPanel({
       name: newChallenge.name.trim(),
       kind: newChallenge.kind,
       category: 'traditional',
-      config: challengeConfig({ id, name: '', kind: newChallenge.kind, category: 'traditional', config: {}, active: true, sort_order: 0 }, newChallenge.kind, target, ''),
+      config: challengeConfig({ id, name: '', kind: newChallenge.kind, category: 'traditional', config: {}, active: true, sort_order: 0 }, newChallenge.kind, target, '', newChallenge.kind === 'checklist' ? 'Practice 1 | Describe the practice' : undefined),
       active: true,
       sort_order: Math.max(0, ...challenges.map((item) => item.sort_order)) + 1,
       started_on: new Date().toISOString().slice(0, 10),
@@ -242,6 +297,40 @@ export default function AdminPanel({
     setChallenges((items) => [...items, challenge]);
     setNewChallenge({ id: '', name: '', kind: 'reps', target: '25' });
     setFeedback({ tone: 'success', text: 'Challenge created. You can refine it below.' });
+  }
+
+  async function inviteMember() {
+    const email = invite.email.trim().toLowerCase();
+    const name = invite.name.trim();
+    if (!email || name.length < 2) return;
+    setBusy(true); setFeedback(null);
+    const prepared = await supabase.rpc('admin_prepare_invitation', { new_email: email, new_display_name: name });
+    if (prepared.error) {
+      setBusy(false);
+      setFeedback({ tone: 'error', text: prepared.error.message || 'Invitation could not be prepared.' });
+      return;
+    }
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: true, emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`, data: { display_name: name } },
+    });
+    setBusy(false);
+    if (error) {
+      setFeedback({ tone: 'error', text: 'The member was approved, but the email could not be sent. Try Send access link after refreshing.' });
+      return;
+    }
+    setInvite({ name: '', email: '' });
+    setFeedback({ tone: 'success', text: `Invitation sent to ${email}. Refresh to see the new account.` });
+  }
+
+  async function deleteMember(member: MemberAdmin) {
+    if (member.id === currentUserId || !window.confirm(`Permanently delete ${member.display_name} and their activity? This cannot be undone.`)) return;
+    setBusy(true); setFeedback(null);
+    const { error } = await supabase.rpc('admin_delete_member', { target_user_id: member.id });
+    setBusy(false);
+    if (error) { setFeedback({ tone: 'error', text: error.message || 'Member could not be deleted.' }); return; }
+    setMembers((items) => items.filter((item) => item.id !== member.id));
+    setFeedback({ tone: 'success', text: `${member.display_name} was deleted.` });
   }
 
   async function createVideo() {
@@ -286,11 +375,19 @@ export default function AdminPanel({
 
       {feedback && <p className="settings-feedback muted admin-global-feedback" data-tone={feedback.tone}>{feedback.text}</p>}
 
-      {section === 'members' && <section><div className="section-heading"><div><p className="eyebrow">Access and roles</p><h2>{members.length} members</h2></div></div><div className="admin-list">{members.map((member) => <MemberEditor key={member.id} member={member} isSelf={member.id === currentUserId} onSaved={replaceMember} />)}</div></section>}
+      {section === 'members' && <section>
+        <div className="section-heading"><div><p className="eyebrow">Access and roles</p><h2>{members.length} members</h2></div></div>
+        <article className="admin-card admin-create-card">
+          <h3>Invite member</h3>
+          <div className="admin-form-grid"><div><label>Name</label><input value={invite.name} maxLength={50} onChange={(event) => setInvite((value) => ({ ...value, name: event.target.value }))} /></div><div><label>Email</label><input type="email" value={invite.email} onChange={(event) => setInvite((value) => ({ ...value, email: event.target.value }))} /></div></div>
+          <button className="btn-water admin-save" disabled={busy || invite.name.trim().length < 2 || !invite.email.includes('@')} onClick={inviteMember}>Send invitation</button>
+        </article>
+        <div className="admin-list">{members.map((member) => <div key={member.id}><MemberEditor member={member} isSelf={member.id === currentUserId} onSaved={replaceMember} />{member.id !== currentUserId && <button className="btn-rope admin-delete-member" disabled={busy} onClick={() => deleteMember(member)}>Delete member permanently</button>}</div>)}</div>
+      </section>}
 
       {section === 'challenges' && <section>
         <div className="section-heading"><div><p className="eyebrow">Daily tracking</p><h2>Challenges</h2></div></div>
-        <article className="admin-card admin-create-card"><h3>Add challenge</h3><div className="admin-form-grid"><div><label>ID</label><input placeholder="e.g. pullups" value={newChallenge.id} onChange={(event) => setNewChallenge((value) => ({ ...value, id: event.target.value }))} /></div><div><label>Name</label><input placeholder="Pull-ups" value={newChallenge.name} onChange={(event) => setNewChallenge((value) => ({ ...value, name: event.target.value }))} /></div><div><label>Type</label><select value={newChallenge.kind} onChange={(event) => setNewChallenge((value) => ({ ...value, kind: event.target.value as Challenge['kind'] }))}><option value="reps">Repetitions</option><option value="timed">Timed</option><option value="done">Done / not done</option></select></div><div><label>Goal</label><input type="number" min="1" disabled={newChallenge.kind === 'done'} value={newChallenge.target} onChange={(event) => setNewChallenge((value) => ({ ...value, target: event.target.value }))} /></div></div><button className="btn-water admin-save" disabled={busy || !newChallenge.name.trim()} onClick={createChallenge}>Add challenge</button></article>
+        <article className="admin-card admin-create-card"><h3>Add challenge</h3><div className="admin-form-grid"><div><label>ID</label><input placeholder="e.g. pullups" value={newChallenge.id} onChange={(event) => setNewChallenge((value) => ({ ...value, id: event.target.value }))} /></div><div><label>Name</label><input placeholder="Pull-ups" value={newChallenge.name} onChange={(event) => setNewChallenge((value) => ({ ...value, name: event.target.value }))} /></div><div><label>Type</label><select value={newChallenge.kind} onChange={(event) => setNewChallenge((value) => ({ ...value, kind: event.target.value as Challenge['kind'] }))}><option value="reps">Repetitions</option><option value="timed">Timed</option><option value="done">Done / not done</option><option value="checklist">Checklist</option></select></div><div><label>Goal</label><input type="number" min="1" disabled={newChallenge.kind === 'done'} value={newChallenge.target} onChange={(event) => setNewChallenge((value) => ({ ...value, target: event.target.value }))} /></div></div><button className="btn-water admin-save" disabled={busy || !newChallenge.name.trim()} onClick={createChallenge}>Add challenge</button></article>
         <div className="admin-list">{challenges.map((challenge) => <ChallengeEditor key={challenge.id} challenge={challenge} onSaved={replaceChallenge} />)}</div>
       </section>}
 

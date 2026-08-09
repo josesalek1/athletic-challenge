@@ -19,11 +19,14 @@ export default async function Training({
   const slot = (wanted && PLAN.find((s) => s.key === wanted)) || slotForWeekday(weekday);
 
   // Sin filtro por usuario: la RLS ya devuelve solo lo tuyo.
-  const [{ data: todaySets }, { data: history }, { data: session }] = await Promise.all([
+  const [{ data: todaySets }, { data: history }, { data: session }, { data: swim }] = await Promise.all([
     supabase.from('training_sets').select('*').eq('day', day).eq('slot', slot.key),
     supabase.from('training_sets').select('*').lt('day', day)
       .eq('slot', slot.key).order('day', { ascending: false }).limit(200),
     supabase.from('training_sessions').select('*').eq('day', day).eq('slot', slot.key).maybeSingle(),
+    slot.kind === 'swim'
+      ? supabase.from('swim_sessions').select('distance_m, duration_s, stroke, rpe, notes').eq('day', day).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   return (
@@ -34,6 +37,7 @@ export default async function Training({
       history={history ?? []}
       done={Boolean(session?.done)}
       userId={user!.id}
+      todaySwim={swim ?? null}
     />
   );
 }

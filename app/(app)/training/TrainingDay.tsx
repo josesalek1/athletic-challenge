@@ -8,6 +8,7 @@ import {
   hasQueuedTrainingSession,
   isNetworkFailure,
   queueMutation,
+  queuedSwimSession,
   queuedTrainingSets,
   removeQueuedMutation,
 } from '@/lib/offline';
@@ -23,6 +24,14 @@ type SetRow = {
   seconds: number | null;
 };
 
+type SwimRow = {
+  distance_m: number | null;
+  duration_s: number | null;
+  stroke: string | null;
+  rpe: number | null;
+  notes: string | null;
+};
+
 export default function TrainingDay({
   slotKey,
   day,
@@ -30,6 +39,7 @@ export default function TrainingDay({
   history,
   done,
   userId,
+  todaySwim,
 }: {
   slotKey: string;
   day: string;
@@ -37,6 +47,7 @@ export default function TrainingDay({
   history: SetRow[];
   done: boolean;
   userId: string;
+  todaySwim: SwimRow | null;
 }) {
   const supabase = createClient();
   const slot = PLAN.find((s) => s.key === slotKey)!;
@@ -54,22 +65,42 @@ export default function TrainingDay({
   );
   const [finished, setFinished] = useState(done);
   const [busy, setBusy] = useState(false);
+  const [swim, setSwim] = useState({
+    distance: todaySwim?.distance_m ? String(todaySwim.distance_m) : '',
+    duration: todaySwim?.duration_s ? String(Math.round(todaySwim.duration_s / 60)) : '',
+    stroke: todaySwim?.stroke ?? 'Mixed',
+    rpe: todaySwim?.rpe ? String(todaySwim.rpe) : '',
+    notes: todaySwim?.notes ?? '',
+  });
+  const [swimFeedback, setSwimFeedback] = useState('');
 
   useEffect(() => {
-    const pendingSets = queuedTrainingSets(userId, day, slot.key);
-    if (pendingSets.length) {
-      setSets((current) => ({
-        ...current,
-        ...Object.fromEntries(pendingSets.map((set) => [
-          `${set.exercise_key}:${set.set_index}`,
-          {
-            weight: set.weight_kg != null ? String(set.weight_kg) : '',
-            reps: set.seconds != null ? String(set.seconds) : set.reps != null ? String(set.reps) : '',
-          },
-        ])),
-      }));
-    }
-    if (hasQueuedTrainingSession(userId, day, slot.key)) setFinished(true);
+    void Promise.all([
+      queuedTrainingSets(userId, day, slot.key),
+      hasQueuedTrainingSession(userId, day, slot.key),
+      queuedSwimSession(userId, day),
+    ]).then(([pendingSets, pendingSession, pendingSwim]) => {
+      if (pendingSets.length) {
+        setSets((current) => ({
+          ...current,
+          ...Object.fromEntries(pendingSets.map((set) => [
+            `${set.exercise_key}:${set.set_index}`,
+            {
+              weight: set.weight_kg != null ? String(set.weight_kg) : '',
+              reps: set.seconds != null ? String(set.seconds) : set.reps != null ? String(set.reps) : '',
+            },
+          ])),
+        }));
+      }
+      if (pendingSession) setFinished(true);
+      if (pendingSwim && slot.kind === 'swim') setSwim({
+        distance: pendingSwim.distance_m ? String(pendingSwim.distance_m) : '',
+        duration: pendingSwim.duration_s ? String(Math.round(pendingSwim.duration_s / 60)) : '',
+        stroke: pendingSwim.stroke ?? 'Mixed',
+        rpe: pendingSwim.rpe ? String(pendingSwim.rpe) : '',
+        notes: pendingSwim.notes ?? '',
+      });
+    });
   }, [day, slot.key, userId]);
 
   // La última vez que hiciste cada ejercicio: la referencia para progresar.
@@ -115,7 +146,7 @@ export default function TrainingDay({
     };
 
     if (!navigator.onLine) {
-      queueMutation(mutation);
+      await queueMutation(mutation);
       return;
     }
 
@@ -131,13 +162,62 @@ export default function TrainingDay({
         seconds: mutation.seconds,
       }, { onConflict: 'user_id,day,slot,exercise_key,set_index' });
       if (error) {
-        if (isNetworkFailure(error)) queueMutation(mutation);
+        if (isNetworkFailure(error)) await queueMutation(mutation);
         else alert('Could not save that set.');
-      } else removeQueuedMutation(mutation.id);
+      } else await removeQueuedMutation(mutation.id);
     } catch (error) {
-      if (isNetworkFailure(error)) queueMutation(mutation);
+      if (isNetworkFailure(error)) await queueMutation(mutation);
       else alert('Could not save that set.');
     }
+  }
+
+  async function saveSwim() {
+    const distance = Math.max(0, Number(swim.distance) || 0);
+    const minutes = Math.max(0, Number(swim.duration) || 0);
+    if (!distance) {
+      setSwimFeedback('Enter the distance completed.');
+      return;
+    }
+    const mutation = {
+      id: `swim_session:${userId}:${day}`,
+      type: 'swim_session' as const,
+      user_id: userId,
+      day,
+      distance_m: distance,
+      duration_s: minutes ? Math.round(minutes * 60) : null,
+      stroke: swim.stroke || null,
+      rpe: swim.rpe ? Math.min(10, Math.max(1, Number(swim.rpe))) : null,
+      notes: swim.notes.trim() || null,
+    };
+    setBusy(true);
+    setSwimFeedback('');
+    if (!navigator.onLine) {
+      await queueMutation(mutation);
+      setBusy(false);
+      setSwimFeedback('Saved offline · waiting to sync.');
+      return;
+    }
+    try {
+      const { error } = await supabase.from('swim_sessions').upsert({
+        user_id: mutation.user_id, day: mutation.day, distance_m: mutation.distance_m,
+        duration_s: mutation.duration_s, stroke: mutation.stroke, rpe: mutation.rpe, notes: mutation.notes,
+      }, { onConflict: 'user_id,day' });
+      if (error) {
+        if (isNetworkFailure(error)) {
+          await queueMutation(mutation);
+          setSwimFeedback('Saved offline · waiting to sync.');
+        } else setSwimFeedback('Could not save this swim.');
+      } else {
+        await removeQueuedMutation(mutation.id);
+        setSwimFeedback('Swim saved.');
+      }
+    } catch (error) {
+      if (isNetworkFailure(error)) {
+        await queueMutation(mutation);
+        setSwimFeedback('Saved offline · waiting to sync.');
+      } else setSwimFeedback('Could not save this swim.');
+    }
+    setBusy(false);
   }
 
   async function finish() {
@@ -152,7 +232,7 @@ export default function TrainingDay({
     };
 
     if (!navigator.onLine) {
-      queueMutation(mutation);
+      await queueMutation(mutation);
       setBusy(false);
       setFinished(true);
       return;
@@ -164,11 +244,11 @@ export default function TrainingDay({
         { onConflict: 'user_id,day,slot' }
       );
       if (error) {
-        if (isNetworkFailure(error)) queueMutation(mutation);
+        if (isNetworkFailure(error)) await queueMutation(mutation);
         else { setBusy(false); alert('Could not close the session.'); return; }
-      } else removeQueuedMutation(mutation.id);
+      } else await removeQueuedMutation(mutation.id);
     } catch (error) {
-      if (isNetworkFailure(error)) queueMutation(mutation);
+      if (isNetworkFailure(error)) await queueMutation(mutation);
       else { setBusy(false); alert('Could not close the session.'); return; }
     }
 
@@ -202,7 +282,7 @@ export default function TrainingDay({
       )}
 
       {slot.kind === 'swim' && (
-        <div className="card">
+        <div className="card swim-log-card">
           {slot.sets!.map((s) => (
             <div key={s.label} className="between"
                  style={{ padding: '11px 0', borderBottom: '1px solid var(--line)' }}>
@@ -218,6 +298,18 @@ export default function TrainingDay({
             <p className="num" style={{ fontSize: 16 }}>
               {slot.sets!.reduce((a, b) => a + b.meters, 0)} m
             </p>
+          </div>
+          <div className="swim-log-form">
+            <p className="eyebrow">Log actual swim</p>
+            <div className="swim-fields">
+              <div><label>Distance · m</label><input inputMode="numeric" type="number" min="0" value={swim.distance} onChange={(event) => setSwim((value) => ({ ...value, distance: event.target.value }))} /></div>
+              <div><label>Duration · min</label><input inputMode="decimal" type="number" min="0" step="0.5" value={swim.duration} onChange={(event) => setSwim((value) => ({ ...value, duration: event.target.value }))} /></div>
+              <div><label>Style</label><select value={swim.stroke} onChange={(event) => setSwim((value) => ({ ...value, stroke: event.target.value }))}><option>Mixed</option><option>Freestyle</option><option>Breaststroke</option><option>Backstroke</option><option>Butterfly</option></select></div>
+              <div><label>Effort · 1–10</label><input inputMode="numeric" type="number" min="1" max="10" value={swim.rpe} onChange={(event) => setSwim((value) => ({ ...value, rpe: event.target.value }))} /></div>
+              <div className="swim-notes"><label>Notes</label><textarea rows={2} maxLength={300} value={swim.notes} onChange={(event) => setSwim((value) => ({ ...value, notes: event.target.value }))} /></div>
+            </div>
+            <button className="btn-water" disabled={busy} onClick={saveSwim}>{busy ? 'Saving…' : 'Save swim details'}</button>
+            {swimFeedback && <p className="muted settings-feedback">{swimFeedback}</p>}
           </div>
         </div>
       )}

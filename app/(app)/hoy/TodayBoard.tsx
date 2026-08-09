@@ -30,12 +30,13 @@ export default function TodayBoard({
   const [section, setSection] = useState(challenges[0]?.id ?? '');
 
   useEffect(() => {
-    const queued = queuedEntries(userId, day);
-    if (!queued.length) return;
-    setLocal((current) => ({
-      ...current,
-      ...Object.fromEntries(queued.map((item) => [item.challenge_id, item.payload])),
-    }));
+    void queuedEntries(userId, day).then((queued) => {
+      if (!queued.length) return;
+      setLocal((current) => ({
+        ...current,
+        ...Object.fromEntries(queued.map((item) => [item.challenge_id, item.payload])),
+      }));
+    });
   }, [day, userId]);
 
   // Día N contado desde started_on: igual para todo el grupo,
@@ -62,7 +63,7 @@ export default function TodayBoard({
     };
 
     if (!navigator.onLine) {
-      queueMutation(mutation);
+      await queueMutation(mutation);
       return;
     }
 
@@ -72,11 +73,11 @@ export default function TodayBoard({
         { onConflict: 'user_id,challenge_id,day' }
       );
       if (error) {
-        if (isNetworkFailure(error)) queueMutation(mutation);
+        if (isNetworkFailure(error)) await queueMutation(mutation);
         else alert('Could not save that result. Try again.');
-      } else removeQueuedMutation(mutation.id);
+      } else await removeQueuedMutation(mutation.id);
     } catch (error) {
-      if (isNetworkFailure(error)) queueMutation(mutation);
+      if (isNetworkFailure(error)) await queueMutation(mutation);
       else alert('Could not save that result. Try again.');
     }
   }
