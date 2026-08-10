@@ -756,6 +756,7 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 }
 .activity-ai-box textarea { resize: vertical; }
 .activity-ai-button { width: 100%; color: var(--water); border-color: var(--water); }
+.activity-ai-privacy { color: var(--mist); font-size: 9px; line-height: 1.45; }
 .activity-form-divider {
   display: flex;
   align-items: center;

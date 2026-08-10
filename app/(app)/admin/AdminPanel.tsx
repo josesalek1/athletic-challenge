@@ -118,6 +118,28 @@ function localActivityDraft(prompt: string): ActivityDraft {
   };
 }
 
+function normalizeGeneratedActivity(value: Record<string, unknown>, fallback: ActivityDraft): ActivityDraft {
+  const category = ACTIVITY_CATEGORIES.some((option) => option.value === value.category)
+    ? value.category as Challenge['category']
+    : fallback.category;
+  const kind = ['timed', 'reps', 'checklist', 'done'].includes(String(value.kind))
+    ? value.kind as Challenge['kind']
+    : fallback.kind;
+  const checklistItems = Array.isArray(value.checklist_items)
+    ? value.checklist_items.map((item) => String(item).trim()).filter(Boolean).slice(0, 12)
+    : [];
+  return {
+    name: String(value.name ?? fallback.name).trim().slice(0, 60) || fallback.name,
+    kind,
+    category,
+    target: String(Math.max(1, Number(value.target ?? fallback.target) || 1)),
+    description: String(value.description ?? fallback.description).trim().slice(0, 220),
+    checklistText: checklistItems.length
+      ? checklistItems.map((item) => `${item} |`).join('\n')
+      : fallback.checklistText,
+  };
+}
+
 function checklistToText(challenge: Challenge) {
   return (challenge.config.items ?? []).map((item) => `${item.name} | ${item.hint}`).join('\n');
 }
@@ -452,6 +474,7 @@ export default function AdminPanel({
   const [activityPrompt, setActivityPrompt] = useState('');
   const [activityPreview, setActivityPreview] = useState<ActivityDraft | null>(null);
   const [activityConfirmed, setActivityConfirmed] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
   const [newVideo, setNewVideo] = useState({ title: '', url: '', challengeId: '', sortOrder: '0' });
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -496,7 +519,7 @@ export default function AdminPanel({
     setFeedback({ tone: 'success', text: created.active ? 'Campaign created and activated.' : 'Campaign created. Add its activities before activating it.' });
   }
 
-  function generateActivityDraft() {
+  async function generateActivityDraft() {
     const prompt = activityPrompt.trim();
     if (prompt.length < 8) {
       setFeedback({ tone: 'error', text: 'Describe the activity in a little more detail first.' });
@@ -504,10 +527,21 @@ export default function AdminPanel({
     }
     const localDraft = localActivityDraft(prompt);
     setFeedback(null);
-    setActivityDraft(localDraft);
+    setAiBusy(true);
+    const { data, error } = await supabase.functions.invoke('parse-activity', { body: { prompt } });
+    setAiBusy(false);
+    const generated = !error && data?.activity && typeof data.activity === 'object'
+      ? normalizeGeneratedActivity(data.activity as Record<string, unknown>, localDraft)
+      : localDraft;
+    setActivityDraft(generated);
     setActivityPreview(null);
     setActivityConfirmed(false);
-    setFeedback({ tone: 'success', text: 'Draft prepared with the private built-in assistant. Review every field before continuing.' });
+    setFeedback({
+      tone: 'success',
+      text: !error && data?.activity
+        ? 'AI draft ready. Review every field before continuing.'
+        : 'AI was unavailable, so a private local draft was prepared instead. Review every field before continuing.',
+    });
   }
 
   function reviewActivity() {
@@ -671,7 +705,8 @@ export default function AdminPanel({
               <div className="activity-ai-box">
                 <label htmlFor="activity-prompt">Optional · describe it naturally</label>
                 <textarea id="activity-prompt" rows={4} maxLength={1000} placeholder="Example: Create a 90-second plank for the strength category. Keep the core tight and hips level." value={activityPrompt} onChange={(event) => setActivityPrompt(event.target.value)} />
-                <button className="btn-ghost activity-ai-button" disabled={activityPrompt.trim().length < 8} onClick={generateActivityDraft}>Generate guided draft</button>
+                <button className="btn-ghost activity-ai-button" disabled={aiBusy || activityPrompt.trim().length < 8} onClick={generateActivityDraft}>{aiBusy ? 'Generating with AI…' : 'Generate draft with AI'}</button>
+                <small className="activity-ai-privacy">Only this description is sent to OpenAI. No member or activity history is included.</small>
               </div>
               <div className="activity-form-divider"><span>Or configure manually</span></div>
               <div className="admin-form-grid">
