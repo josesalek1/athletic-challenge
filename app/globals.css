@@ -817,6 +817,73 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 }
 .activity-confirm-check input { width: 19px; height: 19px; flex: 0 0 19px; accent-color: var(--water); }
 .activity-confirm-actions { grid-template-columns: auto 1fr; }
+.admin-video-actions { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-top: 14px; }
+.admin-feed-help { max-width: 620px; margin: -3px 0 14px 2px; }
+
+/* Community video feed ------------------------------------- */
+.feed-page { max-width: 720px; }
+.feed-title { margin: 8px 0 8px; font-size: clamp(38px, 11vw, 58px); }
+.feed-intro { margin-bottom: 18px; }
+.feed-composer, .feed-post {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--tile);
+}
+.feed-composer { padding: 16px; border-color: var(--water); }
+.feed-composer h2 { margin-top: 3px; font-size: 20px; }
+.feed-permission {
+  padding: 5px 8px;
+  border: 1px solid var(--water);
+  border-radius: 999px;
+  color: var(--water);
+  font: 9px var(--data);
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.feed-form { display: grid; gap: 12px; margin-top: 15px; }
+.feed-form label { margin-bottom: 6px; }
+.feed-form small { color: var(--mist); font-size: 9px; }
+.feed-form textarea { resize: vertical; }
+.feed-submit { width: 100%; margin-top: 13px; }
+.feed-rule { margin-top: 10px; color: var(--mist); font-size: 9px; line-height: 1.45; }
+.feed-feedback { margin: 14px 0 0; }
+.feed-list { display: grid; gap: 16px; margin-top: 16px; }
+.feed-post { min-width: 0; }
+.feed-post[data-hidden='true'] { border-color: var(--rope); opacity: .82; }
+.feed-post-header { align-items: flex-start; padding: 16px 16px 0; }
+.feed-post-header > div { min-width: 0; }
+.feed-post-header span { color: var(--mist); font: 9px var(--data); letter-spacing: .04em; text-transform: uppercase; }
+.feed-post-header h2 { overflow-wrap: anywhere; margin-top: 5px; font-size: 19px; }
+.feed-post-header > strong { padding: 5px 8px; border: 1px solid var(--rope); border-radius: 999px; color: #ff9b7e; font: 9px var(--data); text-transform: uppercase; }
+.feed-description { padding: 10px 16px 15px; color: var(--mist); font-size: 12px; line-height: 1.55; white-space: pre-wrap; }
+.feed-video { position: relative; padding-top: 56.25%; background: var(--deep); }
+.feed-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.feed-open { width: calc(100% - 32px); margin: 14px 16px 2px; }
+.feed-reactions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.feed-reactions button { min-width: 0; padding: 9px 10px; border: 1px solid var(--line); background: var(--deep); color: var(--mist); }
+.feed-reactions button[data-on='true'] { border-color: var(--water); background: #0E3540; color: var(--chalk); }
+.feed-reactions button span { font-size: 17px; }
+.feed-reactions button small { color: inherit; font-size: 10px; }
+.feed-comments { padding: 14px 16px 16px; }
+.feed-comments-heading { margin-bottom: 9px; }
+.feed-comments-heading h3 { font-size: 13px; }
+.feed-comments-heading span { color: var(--mist); font: 10px var(--data); }
+.feed-comment { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.feed-comment > div:first-child { min-width: 0; }
+.feed-comment strong { display: block; color: var(--water); font-size: 10px; }
+.feed-comment p { overflow-wrap: anywhere; margin-top: 3px; color: var(--chalk); font-size: 12px; line-height: 1.45; }
+.feed-comment[data-hidden='true'] p { color: var(--mist); font-style: italic; }
+.feed-comment-actions { display: flex; flex: 0 0 auto; gap: 5px; }
+.feed-comment-actions button { padding: 4px 5px; background: transparent; color: var(--mist); font: 8px var(--data); text-decoration: underline; text-transform: uppercase; }
+.feed-comment-form { margin-top: 11px; padding-top: 12px; border-top: 1px solid var(--line); }
+.feed-comment-form label { margin: 0; }
+.feed-comment-form small { color: var(--mist); font-size: 9px; }
+.feed-comment-form .row { align-items: stretch; margin-top: 7px; gap: 7px; }
+.feed-comment-form input { min-width: 0; }
+.feed-comment-form button { flex: 0 0 auto; padding-inline: 14px; }
+.feed-moderation { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 0 16px 16px; }
+.feed-moderation .btn-ghost { min-width: 0; padding: 10px 8px; color: var(--mist); font-size: 11px; }
 
 /* Offline queue and fallback -------------------------------- */
 .offline-status {
@@ -879,4 +946,11 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
   .metric-row strong { font-size: 11px; }
   .admin-card { padding: 14px; }
   .admin-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-video-actions { grid-template-columns: 1fr; }
+  .feed-composer { padding: 14px; }
+  .feed-post-header, .feed-comments { padding-left: 14px; padding-right: 14px; }
+  .feed-description { padding-left: 14px; padding-right: 14px; }
+  .feed-reactions { padding-left: 14px; padding-right: 14px; }
+  .feed-comment { display: block; }
+  .feed-comment-actions { margin-top: 6px; }
 }

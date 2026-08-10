@@ -21,7 +21,11 @@ export type VideoAdmin = {
   challenge_id: string | null;
   title: string;
   url: string;
+  description: string;
+  created_by: string | null;
+  status: 'published' | 'hidden';
   sort_order: number;
+  created_at: string;
 };
 
 export default async function AdminPage() {
@@ -39,7 +43,7 @@ export default async function AdminPage() {
     supabase.rpc('admin_list_members'),
     supabase.from('campaigns').select('*').order('starts_on', { ascending: false }),
     supabase.from('challenges').select('*').order('sort_order'),
-    supabase.from('videos').select('id, challenge_id, title, url, sort_order').order('sort_order'),
+    supabase.from('videos').select('id, challenge_id, title, url, description, created_by, status, sort_order, created_at').order('created_at', { ascending: false }),
   ]);
 
   return (

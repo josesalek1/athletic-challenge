@@ -1,61 +1,25 @@
 import { createClient } from '@/lib/supabase/server';
+import CommunityFeed, { type FeedComment, type FeedPerson, type FeedPost, type FeedReaction } from './CommunityFeed';
 
 export const dynamic = 'force-dynamic';
 
-function embed(url: string) {
-  const yt = url.match(/(?:youtu\.be\/|v=|shorts\/)([\w-]{11})/);
-  if (yt) return `https://www.youtube-nocookie.com/embed/${yt[1]}`;
-  const drive = url.match(/drive\.google\.com\/file\/d\/([\w-]+)/);
-  if (drive) return `https://drive.google.com/file/d/${drive[1]}/preview`;
-  return null;
-}
-
 export default async function Videos() {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from('videos')
-    .select('id, title, url, challenge_id')
-    .order('sort_order');
+  const { data: { user } } = await supabase.auth.getUser();
+  const [profileResult, postsResult, reactionsResult, commentsResult, peopleResult] = await Promise.all([
+    supabase.from('profiles').select('role').eq('id', user!.id).single(),
+    supabase.from('videos').select('id, challenge_id, title, url, description, created_by, status, created_at').order('created_at', { ascending: false }),
+    supabase.from('video_reactions').select('video_id, user_id, reaction'),
+    supabase.from('video_comments').select('id, video_id, user_id, body, hidden, created_at').order('created_at'),
+    supabase.from('profiles').select('id, display_name'),
+  ]);
 
-  const videos = data ?? [];
-
-  return (
-    <main className="wrap">
-      <p className="eyebrow">From the coach</p>
-      <h1 className="display" style={{ fontSize: 36, margin: '8px 0 20px' }}>Exercises</h1>
-
-      {videos.length === 0 ? (
-        <p className="empty">
-          There are no videos yet.
-          <br />
-          An administrator can add them from <strong>More → Manage Athletic Challenge</strong>.
-        </p>
-      ) : (
-        videos.map((v) => {
-          const src = embed(v.url);
-          return (
-            <div key={v.id} className="card">
-              <p style={{ fontWeight: 600, marginBottom: 12 }}>{v.title}</p>
-              {src ? (
-                <div style={{ position: 'relative', paddingTop: '56.25%', borderRadius: 10, overflow: 'hidden' }}>
-                  <iframe
-                    src={src}
-                    title={v.title}
-                    allow="accelerometer; encrypted-media; picture-in-picture; fullscreen"
-                    allowFullScreen
-                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
-                  />
-                </div>
-              ) : (
-                <a className="btn btn-ghost" style={{ width: '100%' }} href={v.url}
-                   target="_blank" rel="noopener noreferrer">
-                  Open video
-                </a>
-              )}
-            </div>
-          );
-        })
-      )}
-    </main>
-  );
+  return <CommunityFeed
+    currentUserId={user!.id}
+    isAdmin={profileResult.data?.role === 'admin'}
+    initialPosts={(postsResult.data ?? []) as FeedPost[]}
+    initialReactions={(reactionsResult.data ?? []) as FeedReaction[]}
+    initialComments={(commentsResult.data ?? []) as FeedComment[]}
+    people={(peopleResult.data ?? []) as FeedPerson[]}
+  />;
 }

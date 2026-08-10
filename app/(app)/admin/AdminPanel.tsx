@@ -408,6 +408,7 @@ function VideoEditor({ video, challenges, onSaved, onDeleted }: { video: VideoAd
   const supabase = createClient();
   const [title, setTitle] = useState(video.title);
   const [url, setUrl] = useState(video.url);
+  const [description, setDescription] = useState(video.description);
   const [challengeId, setChallengeId] = useState(video.challenge_id ?? '');
   const [sortOrder, setSortOrder] = useState(String(video.sort_order));
   const [busy, setBusy] = useState(false);
@@ -416,12 +417,23 @@ function VideoEditor({ video, challenges, onSaved, onDeleted }: { video: VideoAd
   async function save() {
     setBusy(true);
     setFeedback(null);
-    const next = { ...video, title: title.trim(), url: url.trim(), challenge_id: challengeId || null, sort_order: Number(sortOrder) || 0 };
-    const { error } = await supabase.from('videos').update(next).eq('id', video.id);
+    const changes = { title: title.trim(), url: url.trim(), description: description.trim(), challenge_id: challengeId || null, sort_order: Number(sortOrder) || 0 };
+    const { error } = await supabase.from('videos').update(changes).eq('id', video.id);
     setBusy(false);
     if (error) { setFeedback({ tone: 'error', text: error.message || 'Video could not be updated.' }); return; }
-    onSaved(next);
+    onSaved({ ...video, ...changes });
     setFeedback({ tone: 'success', text: 'Video updated.' });
+  }
+
+  async function moderate() {
+    const shouldHide = video.status === 'published';
+    setBusy(true);
+    setFeedback(null);
+    const { error } = await supabase.rpc('admin_moderate_video', { target_video_id: video.id, should_hide: shouldHide });
+    setBusy(false);
+    if (error) { setFeedback({ tone: 'error', text: error.message || 'Video visibility could not be changed.' }); return; }
+    onSaved({ ...video, status: shouldHide ? 'hidden' : 'published' });
+    setFeedback({ tone: 'success', text: shouldHide ? 'Post hidden from members.' : 'Post restored to the feed.' });
   }
 
   async function remove() {
@@ -435,13 +447,15 @@ function VideoEditor({ video, challenges, onSaved, onDeleted }: { video: VideoAd
 
   return (
     <article className="admin-card">
+      <div className="between admin-card-heading"><div><p className="eyebrow">{video.created_by ? 'Member post' : 'Coach / imported'}</p><h3>{video.title}</h3></div><span className="status-dot" data-status={video.status === 'published' ? 'active' : 'inactive'}>{video.status}</span></div>
       <div className="admin-form-grid">
         <div className="admin-wide"><label>Title</label><input value={title} onChange={(event) => setTitle(event.target.value)} /></div>
         <div className="admin-wide"><label>URL</label><input type="url" value={url} onChange={(event) => setUrl(event.target.value)} /></div>
+        <div className="admin-wide"><label>Description</label><textarea rows={3} maxLength={500} value={description} onChange={(event) => setDescription(event.target.value)} /></div>
         <div><label>Activity</label><select value={challengeId} onChange={(event) => setChallengeId(event.target.value)}><option value="">General</option>{challenges.map((challenge) => <option key={challenge.id} value={challenge.id}>{challenge.name}</option>)}</select></div>
         <div><label>Order</label><input type="number" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)} /></div>
       </div>
-      <div className="admin-button-row"><button className="btn-water" disabled={busy || !title.trim() || !url.trim()} onClick={save}>Save video</button><button className="btn-ghost" disabled={busy} onClick={remove}>Remove</button></div>
+      <div className="admin-video-actions"><button className="btn-water" disabled={busy || !title.trim() || !url.trim()} onClick={save}>Save video</button><button className="btn-ghost" disabled={busy} onClick={moderate}>{video.status === 'published' ? 'Hide from feed' : 'Restore to feed'}</button><button className="btn-ghost" disabled={busy} onClick={remove}>Delete</button></div>
       {feedback && <p className="settings-feedback muted" data-tone={feedback.tone}>{feedback.text}</p>}
     </article>
   );
@@ -475,7 +489,7 @@ export default function AdminPanel({
   const [activityPreview, setActivityPreview] = useState<ActivityDraft | null>(null);
   const [activityConfirmed, setActivityConfirmed] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
-  const [newVideo, setNewVideo] = useState({ title: '', url: '', challengeId: '', sortOrder: '0' });
+  const [newVideo, setNewVideo] = useState({ title: '', url: '', description: '', challengeId: '', sortOrder: '0' });
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [invite, setInvite] = useState({ name: '', email: '' });
@@ -631,12 +645,12 @@ export default function AdminPanel({
   async function createVideo() {
     if (!newVideo.title.trim() || !newVideo.url.trim()) return;
     setBusy(true); setFeedback(null);
-    const draft = { title: newVideo.title.trim(), url: newVideo.url.trim(), challenge_id: newVideo.challengeId || null, sort_order: Number(newVideo.sortOrder) || 0 };
-    const { data, error } = await supabase.from('videos').insert(draft).select('id, challenge_id, title, url, sort_order').single();
+    const draft = { title: newVideo.title.trim(), url: newVideo.url.trim(), description: newVideo.description.trim(), challenge_id: newVideo.challengeId || null, created_by: currentUserId, status: 'published', sort_order: Number(newVideo.sortOrder) || 0 };
+    const { data, error } = await supabase.from('videos').insert(draft).select('id, challenge_id, title, url, description, created_by, status, sort_order, created_at').single();
     setBusy(false);
     if (error) { setFeedback({ tone: 'error', text: error.message || 'Video could not be added.' }); return; }
     setVideos((items) => [...items, data as VideoAdmin].sort((a, b) => a.sort_order - b.sort_order));
-    setNewVideo({ title: '', url: '', challengeId: '', sortOrder: '0' });
+    setNewVideo({ title: '', url: '', description: '', challengeId: '', sortOrder: '0' });
     setFeedback({ tone: 'success', text: 'Video added.' });
   }
 
@@ -742,8 +756,9 @@ export default function AdminPanel({
       </section>}
 
       {section === 'videos' && <section>
-        <div className="section-heading"><div><p className="eyebrow">Training library</p><h2>Videos</h2></div></div>
-        <article className="admin-card admin-create-card"><h3>Add video</h3><div className="admin-form-grid"><div className="admin-wide"><label>Title</label><input value={newVideo.title} onChange={(event) => setNewVideo((value) => ({ ...value, title: event.target.value }))} /></div><div className="admin-wide"><label>URL</label><input type="url" placeholder="https://…" value={newVideo.url} onChange={(event) => setNewVideo((value) => ({ ...value, url: event.target.value }))} /></div><div><label>Activity</label><select value={newVideo.challengeId} onChange={(event) => setNewVideo((value) => ({ ...value, challengeId: event.target.value }))}><option value="">General</option>{challenges.map((challenge) => <option key={challenge.id} value={challenge.id}>{challenge.name}</option>)}</select></div><div><label>Order</label><input type="number" value={newVideo.sortOrder} onChange={(event) => setNewVideo((value) => ({ ...value, sortOrder: event.target.value }))} /></div></div><button className="btn-water admin-save" disabled={busy || !newVideo.title.trim() || !newVideo.url.trim()} onClick={createVideo}>Add video</button></article>
+        <div className="section-heading"><div><p className="eyebrow">Permissions and moderation</p><h2>Community feed</h2></div></div>
+        <p className="muted admin-help admin-feed-help">Active members may share external video links and delete their own posts. Administrators can edit, hide, restore or permanently delete every post. Comment moderation lives directly in the feed.</p>
+        <article className="admin-card admin-create-card"><h3>Add coach video</h3><div className="admin-form-grid"><div className="admin-wide"><label>Title</label><input maxLength={80} value={newVideo.title} onChange={(event) => setNewVideo((value) => ({ ...value, title: event.target.value }))} /></div><div className="admin-wide"><label>URL</label><input type="url" placeholder="https://…" value={newVideo.url} onChange={(event) => setNewVideo((value) => ({ ...value, url: event.target.value }))} /></div><div className="admin-wide"><label>Description</label><textarea rows={3} maxLength={500} value={newVideo.description} onChange={(event) => setNewVideo((value) => ({ ...value, description: event.target.value }))} /></div><div><label>Activity</label><select value={newVideo.challengeId} onChange={(event) => setNewVideo((value) => ({ ...value, challengeId: event.target.value }))}><option value="">General</option>{challenges.map((challenge) => <option key={challenge.id} value={challenge.id}>{challenge.name}</option>)}</select></div><div><label>Order</label><input type="number" value={newVideo.sortOrder} onChange={(event) => setNewVideo((value) => ({ ...value, sortOrder: event.target.value }))} /></div></div><button className="btn-water admin-save" disabled={busy || !newVideo.title.trim() || !newVideo.url.trim()} onClick={createVideo}>Publish video</button></article>
         {videos.length ? <div className="admin-list">{videos.map((video) => <VideoEditor key={video.id} video={video} challenges={challenges} onSaved={replaceVideo} onDeleted={(id) => setVideos((items) => items.filter((item) => item.id !== id))} />)}</div> : <p className="empty">No videos have been added yet.</p>}
       </section>}
 
