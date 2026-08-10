@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { lastNDays, mmss, today } from '@/lib/format';
 import { validChecklistDone } from '@/lib/checklist';
@@ -53,7 +54,7 @@ function changePercent(current: number, previous: number, lowerIsBetter = false)
 }
 
 function signedPercent(value: number | null) {
-  if (value == null) return 'New';
+  if (value == null) return 'No previous data';
   return `${value > 0 ? '+' : ''}${value}%`;
 }
 
@@ -98,13 +99,6 @@ function formatAverageValue(value: number, challenge: Challenge) {
   if (challenge.kind === 'checklist') return `${value.toFixed(1)}/${challenge.config.items?.length ?? 0}`;
   if (challenge.kind === 'done') return `${Math.round(value * 100)}%`;
   return `${value.toFixed(1)} reps`;
-}
-
-function formatTotal(value: number, challenge: Challenge) {
-  if (challenge.kind === 'timed') return mmss(value);
-  if (challenge.kind === 'checklist') return `${value} practices`;
-  if (challenge.kind === 'done') return plural(value, 'session');
-  return `${value} reps`;
 }
 
 function plural(value: number, singular: string, pluralForm = `${singular}s`) {
@@ -162,6 +156,10 @@ export default async function Progress({
     `${entry.day}|${entry.challenge_id}`,
     entry,
   ]));
+  const byAllPrivateKey = new Map(privateEntries.map((entry) => [
+    `${entry.day}|${entry.challenge_id}`,
+    entry,
+  ]));
   const bySharedKey = new Map(shared.map((checkin) => [
     `${checkin.user_id}|${checkin.day}|${checkin.challenge_id}`,
     checkin,
@@ -192,16 +190,20 @@ export default async function Progress({
     const goalDays = timeline.filter((item) => item.value >= target).length;
     const possibleDays = days.filter((day) => !challenge.started_on || challenge.started_on <= day).length;
     const latest = [...timeline].reverse().find((item) => item.value > 0)?.value ?? 0;
-    const total = values.reduce((sum, value) => sum + value, 0);
-    const midpoint = Math.max(1, Math.floor(timeline.length / 2));
-    const firstAverage = timeline.slice(0, midpoint).reduce((sum, item) => sum + item.value, 0) / midpoint;
-    const recent = timeline.slice(midpoint);
-    const recentAverage = recent.reduce((sum, item) => sum + item.value, 0) / Math.max(1, recent.length);
-    const direction = recentAverage > firstAverage ? 'up' : recentAverage < firstAverage ? 'down' : 'steady';
     const currentAverage = average(values);
     const previousAverage = average(previousValues);
     const change = changePercent(currentAverage, previousAverage);
     const historicBest = historicValues.length ? Math.max(...historicValues) : 0;
+    let goalStreak = 0;
+    for (let index = allDays.length - 1; index >= 0; index--) {
+      const streakDay = allDays[index];
+      const streakValue = valueFor(byAllPrivateKey.get(`${streakDay}|${challenge.id}`), challenge);
+      if (streakValue >= target) goalStreak++;
+      else if (streakDay !== currentDay) break;
+    }
+    const trendLabel = change == null
+      ? 'Not enough data'
+      : change > 2 ? 'Improving' : change < -2 ? 'Declining' : 'Stable';
     const insight = !values.length
       ? `No ${challenge.name} result has been logged in this period yet.`
       : previousValues.length
@@ -224,16 +226,19 @@ export default async function Progress({
       possibleDays,
       activeDays: values.length,
       latest,
-      total,
       best: historicBest,
       average: currentAverage,
       previousAverage,
       change,
       insight,
       practiceCounts,
-      direction,
+      goalStreak,
+      trendLabel,
     };
   });
+  const challengeEntryCount = challengeProgress.reduce((sum, item) => sum + item.activeDays, 0);
+  const goalsAchieved = challengeProgress.reduce((sum, item) => sum + item.goalDays, 0);
+  const goalRate = challengeEntryCount ? Math.round((goalsAchieved / challengeEntryCount) * 100) : 0;
 
   const requestedChallenge = params.challenge ?? 'all';
   const selectedChallenge = active.some((challenge) => challenge.id === requestedChallenge)
@@ -272,10 +277,7 @@ export default async function Progress({
   const trainingVolume = Math.round(periodSets.reduce((sum, set) =>
     sum + ((set.weight_kg ?? 0) * (set.reps ?? 0)), 0
   ));
-  const trainingDays = new Set([
-    ...periodTraining.map((session) => session.day),
-    ...periodSets.map((set) => set.day),
-  ]).size;
+  const completedTrainingSessions = periodTraining.length;
 
   const exerciseLookup = new Map(PLAN.flatMap((slot) => slot.exercises ?? []).map((exercise) => [exercise.key, exercise]));
   const exerciseProgress = [...new Set(periodSets.map((set) => set.exercise_key))].map((key) => {
@@ -396,6 +398,7 @@ export default async function Progress({
   const groupGoalRate = periodCheckins.length
     ? Math.round((periodCheckins.filter((checkin) => checkin.goal_met).length / periodCheckins.length) * 100)
     : 0;
+  const groupGoalsAchieved = periodCheckins.filter((checkin) => checkin.goal_met).length;
   const activeMemberDays = groupTimeline.reduce((sum, item) => sum + item.activeMembers, 0);
   const possibleMemberDays = (profiles?.length ?? 0) * days.length;
   const groupParticipation = possibleMemberDays
@@ -452,6 +455,7 @@ export default async function Progress({
           <Link key={value} href={`/semana?view=${view}&days=${value}&challenge=${selectedChallenge}`}
                 className="range-option" data-on={range === value}>
             {value}
+            <small>days</small>
           </Link>
         ))}
       </nav>
@@ -459,9 +463,9 @@ export default async function Progress({
       {view === 'me' ? (
         <>
           <section className="insight-strip" aria-label="Personal overview">
-            <div><strong className="num">{challengeProgress.reduce((sum, item) => sum + item.activeDays, 0)}</strong><span>logged results</span></div>
-            <div><strong className="num">{trainingDays}</strong><span>training days</span></div>
-            <div><strong className="num">{challengeProgress.reduce((sum, item) => sum + item.goalDays, 0)}</strong><span>goals met</span></div>
+            <div><strong className="num">{challengeEntryCount}</strong><span>challenge entries<small>one activity on one day</small></span></div>
+            <div><strong className="num">{completedTrainingSessions}</strong><span>completed sessions<small>strength or swimming</small></span></div>
+            <div><strong className="num">{goalRate}%</strong><span>goals achieved<small>{goalsAchieved} of {challengeEntryCount}</small></span></div>
           </section>
 
           <div className="section-heading">
@@ -487,8 +491,8 @@ export default async function Progress({
                       {item.goalDays}/{item.possibleDays} goal days · {plural(item.activeDays, 'entry', 'entries')}
                     </p>
                   </div>
-                  <span className="trend-mark" data-direction={item.direction} aria-label={`${item.direction} trend`}>
-                    {item.direction === 'up' ? '↗' : item.direction === 'down' ? '↘' : '→'}
+                  <span className="trend-mark" data-direction={item.change == null ? 'unknown' : item.change > 2 ? 'up' : item.change < -2 ? 'down' : 'steady'}>
+                    {item.trendLabel}
                   </span>
                 </div>
 
@@ -497,7 +501,7 @@ export default async function Progress({
                     <i key={point.day} title={`${shortDate(point.day)}: ${formatValue(point.value, item.challenge)}`}
                        data-today={point.day === currentDay}
                        data-empty={point.value === 0}
-                       style={{ height: `${point.value ? Math.max(point.percent, 10) : 5}%` }} />
+                       style={{ '--bar-height': `${point.value ? Math.max(point.percent, 10) : 5}%` } as CSSProperties} />
                   ))}
                 </div>
                 <div className="chart-axis num"><span>{shortDate(days[0])}</span><span>Today</span></div>
@@ -506,13 +510,17 @@ export default async function Progress({
                   <div><span>Latest</span><strong className="num">{formatValue(item.latest, item.challenge)}</strong></div>
                   <div><span>Average</span><strong className="num">{formatAverageValue(item.average, item.challenge)}</strong></div>
                   <div>
-                    <span>vs previous</span>
+                    <span>vs prior {range} days</span>
                     <strong className="num" data-positive={item.change != null && item.change > 0}>{signedPercent(item.change)}</strong>
                   </div>
                 </div>
                 <div className="record-row">
-                  <span>All-time best</span>
+                  <span>Personal record</span>
                   <strong className="num">{formatValue(item.best, item.challenge)}</strong>
+                </div>
+                <div className="record-row">
+                  <span>Current goal streak</span>
+                  <strong className="num">{plural(item.goalStreak, 'day')}</strong>
                 </div>
                 <p className="auto-insight">{item.insight}</p>
                 {item.practiceCounts.length > 0 && (
@@ -547,10 +555,11 @@ export default async function Progress({
               <div className="metric-row">
                 <div><span>Sessions</span><strong className="num">{swimSessionCount}</strong></div>
                 <div><span>Avg pace</span><strong className="num">{swimPace ? `${mmss(swimPace)}/100m` : '—'}</strong></div>
-                <div><span>vs previous</span><strong className="num">{signedPercent(swimPaceChange)}</strong></div>
+                <div><span>Pace change</span><strong className="num">{signedPercent(swimPaceChange)}</strong></div>
               </div>
               <div className="record-row"><span>Best pace</span><strong className="num">{bestSwimPace ? `${mmss(bestSwimPace)}/100m` : '—'}</strong></div>
               <div className="record-row"><span>Average effort</span><strong className="num">{averageRpe ? `${averageRpe.toFixed(1)}/10` : '—'}</strong></div>
+              <p className="metric-explainer">Pace is calculated only from the distance and duration you enter manually. No watch is connected.</p>
             </article>
           </div>
 
@@ -564,7 +573,7 @@ export default async function Progress({
                     <div className="metric-row">
                       <div><span>Latest</span><strong className="num">{exercise.timed ? mmss(exercise.latestSeconds) : exercise.latestWeight ? `${exercise.latestWeight} kg` : `${exercise.latestReps} reps`}</strong></div>
                       <div><span>Personal best</span><strong className="num">{exercise.timed ? mmss(exercise.bestSeconds) : exercise.bestWeight ? `${exercise.bestWeight} kg` : `${exercise.bestReps} reps`}</strong></div>
-                      <div><span>vs previous</span><strong className="num">{signedPercent(exercise.change)}</strong></div>
+                      <div><span>vs prior {range} days</span><strong className="num">{signedPercent(exercise.change)}</strong></div>
                     </div>
                   </article>
                 ))}
@@ -584,26 +593,31 @@ export default async function Progress({
             </section>
           )}
           <section className="insight-strip" aria-label="Group overview">
-            <div><strong className="num">{groupParticipation}%</strong><span>daily participation</span></div>
-            <div><strong className="num">{groupGoalRate}%</strong><span>shared goals met</span></div>
-            <div><strong className="num">{collectiveStreak}</strong><span>collective streak</span></div>
+            <div><strong className="num">{groupParticipation}%</strong><span>daily participation<small>active member-days</small></span></div>
+            <div><strong className="num">{groupGoalRate}%</strong><span>shared goals met<small>{groupGoalsAchieved} of {periodCheckins.length}</small></span></div>
+            <div><strong className="num">{collectiveStreak}</strong><span>full-group streak<small>days in a row</small></span></div>
           </section>
 
           <article className="insight-card group-trend-card">
             <div className="between insight-title">
-              <div><p className="eyebrow">Momentum</p><h2>Members checking in</h2></div>
-              <strong className="num">{groupParticipation}%</strong>
+              <div><p className="eyebrow">Momentum</p><h2>Active members by day</h2></div>
+              <strong className="num">{todayActive}/{profiles?.length ?? 0}<small> today</small></strong>
             </div>
             <div className="personal-chart group-chart" style={{ gridTemplateColumns: `repeat(${range}, minmax(0, 1fr))` }}>
               {groupTimeline.map((point) => (
                 <i key={point.day} title={`${shortDate(point.day)}: ${point.activeMembers}/${profiles?.length ?? 0} members`}
                    data-today={point.day === currentDay}
                    data-empty={point.activeMembers === 0}
-                   style={{ height: `${point.activeMembers ? Math.max(point.percent, 10) : 5}%` }} />
+                   style={{ '--bar-height': `${point.activeMembers ? Math.max(point.percent, 10) : 5}%` } as CSSProperties} />
               ))}
             </div>
             <div className="chart-axis num"><span>{shortDate(days[0])}</span><span>Today</span></div>
+            <p className="metric-explainer">Each bar shows how many active members logged at least one challenge that day.</p>
           </article>
+
+          <p className="metric-explainer collective-explainer">
+            Full-group streak counts consecutive days when every active member logged at least one challenge. Today counts only after everyone checks in.
+          </p>
 
           <div className="section-heading">
             <div><p className="eyebrow">By challenge</p><h2>What is working</h2></div>

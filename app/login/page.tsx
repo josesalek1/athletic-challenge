@@ -4,22 +4,19 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 export default function Login() {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [inviteCode, setInviteCode] = useState('');
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [message, setMessage] = useState('');
-  const ready = Boolean(
-    email.trim() &&
-    (mode === 'login' || (displayName.trim() && inviteCode.trim()))
-  );
+  const ready = Boolean(email.trim());
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('error') === 'account_disabled') {
       setState('error');
       setMessage('This account is inactive. Contact the group administrator.');
+    } else if (params.get('error') === 'link_expired') {
+      setState('error');
+      setMessage('This access link expired or was already used. Request a fresh one below.');
     }
   }, []);
 
@@ -29,23 +26,14 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
       options: {
+        shouldCreateUser: false,
         emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
-        ...(mode === 'register' && {
-          data: {
-            display_name: displayName.trim(),
-            invite_code: inviteCode.trim(),
-          },
-        }),
       },
     });
 
     if (error) {
       setState('error');
-      setMessage(
-        mode === 'register'
-          ? 'Registration failed. Check your name and group code.'
-          : 'The sign-in link could not be sent. Check your email and try again.'
-      );
+      setMessage('No invited account was found for this email, or the link could not be sent. Ask the group administrator for an invitation.');
       return;
     }
     setState('sent');
@@ -58,7 +46,7 @@ export default function Login() {
         Athletic Challenge
       </h1>
       <p className="muted" style={{ marginBottom: 30 }}>
-        Your group’s daily challenge. Sign in with your email — no password needed.
+        Invited members sign in with one email link — no registration or password required.
       </p>
 
       {state === 'sent' ? (
@@ -72,41 +60,9 @@ export default function Login() {
         </div>
       ) : (
         <div className="card">
-          <div className="chips" role="tablist" style={{ marginBottom: 18 }}>
-            <button className="chip" role="tab" data-on={mode === 'login'}
-                    aria-selected={mode === 'login'} onClick={() => {
-                      setMode('login');
-                      setState('idle');
-                    }}>
-              Sign in
-            </button>
-            <button className="chip" role="tab" data-on={mode === 'register'}
-                    aria-selected={mode === 'register'} onClick={() => {
-                      setMode('register');
-                      setState('idle');
-                    }}>
-              Register
-            </button>
-          </div>
-
-          {mode === 'register' && (
-            <>
-              <label htmlFor="display-name">Your name</label>
-              <input
-                id="display-name"
-                type="text"
-                autoComplete="name"
-                value={displayName}
-                placeholder="First and last name"
-                maxLength={50}
-                onChange={(e) => setDisplayName(e.target.value)}
-              />
-            </>
-          )}
-
-          <label htmlFor="email" style={{ marginTop: mode === 'register' ? 14 : 0 }}>
-            Your email
-          </label>
+          <p style={{ fontWeight: 600, marginBottom: 5 }}>Open Athletic Challenge</p>
+          <p className="muted" style={{ marginBottom: 16 }}>Use the email address your administrator invited.</p>
+          <label htmlFor="email">Your email</label>
           <input
             id="email"
             type="email"
@@ -118,34 +74,20 @@ export default function Login() {
             onKeyDown={(e) => e.key === 'Enter' && ready && send()}
           />
 
-          {mode === 'register' && (
-            <>
-              <label htmlFor="invite-code" style={{ marginTop: 14 }}>Group code</label>
-              <input
-                id="invite-code"
-                type="text"
-                autoComplete="off"
-                value={inviteCode}
-                placeholder="Private group code"
-                onChange={(e) => setInviteCode(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && ready && send()}
-              />
-            </>
-          )}
-
           <button
             className="btn-water"
             style={{ width: '100%', marginTop: 14 }}
             disabled={!ready || state === 'sending'}
             onClick={send}
           >
-            {state === 'sending'
-              ? 'Sending…'
-              : mode === 'register' ? 'Register and send link' : 'Send me a sign-in link'}
+            {state === 'sending' ? 'Sending…' : 'Send me an access link'}
           </button>
           {state === 'error' && (
             <p className="muted" style={{ marginTop: 12, color: 'var(--rope)' }}>{message}</p>
           )}
+          <p className="muted" style={{ marginTop: 14, textAlign: 'center' }}>
+            Not invited yet? Ask the Athletic Challenge administrator.
+          </p>
         </div>
       )}
     </main>

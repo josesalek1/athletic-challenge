@@ -39,15 +39,15 @@ function escapeHtml(value: string) {
 }
 
 function subjectFor(action: EmailAction) {
-  if (action === 'recovery') return 'Recupera tu acceso a Athletic Challenge'
-  if (action === 'invite') return 'Tu invitación a Athletic Challenge'
-  return 'Tu enlace para Athletic Challenge'
+  if (action === 'recovery') return 'Recover your Athletic Challenge access'
+  if (action === 'invite' || action === 'signup') return "You're invited to Athletic Challenge"
+  return 'Your Athletic Challenge access link'
 }
 
 function copyFor(action: EmailAction) {
-  if (action === 'recovery') return 'Pulsa el botón para recuperar tu acceso.'
-  if (action === 'invite') return 'Pulsa el botón para aceptar la invitación.'
-  return 'Pulsa el botón para entrar. No necesitas contraseña.'
+  if (action === 'recovery') return 'Tap the button to recover your access.'
+  if (action === 'invite' || action === 'signup') return 'You have been invited by the group administrator. No registration or password is required.'
+  return 'Tap the button to sign in. No password is required.'
 }
 
 Deno.serve(async (request) => {
@@ -87,25 +87,28 @@ Deno.serve(async (request) => {
         subject: subjectFor(emailData.email_action_type),
         htmlContent: `
           <!doctype html>
-          <html lang="es">
+          <html lang="en">
             <body style="margin:0;background:#082f35;font-family:Arial,sans-serif;color:#eff9f7">
               <div style="max-width:560px;margin:0 auto;padding:48px 24px">
                 <p style="margin:0 0 12px;color:#82b8ba;font-size:13px;letter-spacing:2px;text-transform:uppercase">
                   Athletic Challenge
                 </p>
-                <h1 style="margin:0 0 16px;font-size:32px;line-height:1.1">Tu acceso está listo</h1>
+                <h1 style="margin:0 0 16px;font-size:32px;line-height:1.1">Your access is ready</h1>
                 <p style="margin:0 0 28px;color:#b8d1d1;font-size:17px;line-height:1.6">${safeCopy}</p>
+                <p style="margin:0 0 28px;color:#b8d1d1;font-size:15px;line-height:1.6">
+                  Open this email on the device where you will use the app. One tap signs you in and takes you directly to Today.
+                </p>
                 <a href="${safeUrl}" style="display:inline-block;background:#37b8c8;color:#062f35;text-decoration:none;font-weight:700;padding:15px 22px;border-radius:10px">
-                  Entrar a Athletic Challenge
+                  Open Athletic Challenge
                 </a>
                 <p style="margin:28px 0 0;color:#82a6a8;font-size:13px;line-height:1.5">
-                  Este enlace es personal y caduca. Si no lo solicitaste, puedes ignorar este mensaje.
+                  This personal link expires and can only be used once. If you did not expect it, you can ignore this email.
                 </p>
               </div>
             </body>
           </html>
         `,
-        textContent: `${copyFor(emailData.email_action_type)}\n\n${verificationUrl.toString()}\n\nEste enlace es personal y caduca.`,
+        textContent: `${copyFor(emailData.email_action_type)}\n\nOpen this email on the device where you will use the app. One tap signs you in and opens Today.\n\n${verificationUrl.toString()}\n\nThis personal link expires and can only be used once.`,
         tags: ['supabase-auth', emailData.email_action_type],
       }),
     })

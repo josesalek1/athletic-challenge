@@ -114,15 +114,15 @@ export default function TodayBoard({
           weekday: 'long', day: 'numeric', month: 'long',
         })}
       </p>
-      <h1 className="display" style={{ fontSize: 40, margin: '8px 0 20px' }}>
-        Day {dayNumber}
+      <h1 className="display today-title">
+        Athletic Challenge <span>· Day {dayNumber}</span>
       </h1>
 
       {challenges.length === 0 ? (
         <p className="empty">
           No active challenge.
           <br />
-          Turn one on in Supabase: table <code>challenges</code>, column <code>active</code>.
+          Ask an administrator to activate one from the Admin panel.
         </p>
       ) : (
         <>

@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import type { Challenge } from '@/lib/types';
 import type { MemberAdmin, VideoAdmin } from './page';
 
-type Section = 'members' | 'challenges' | 'videos' | 'code';
+type Section = 'members' | 'challenges' | 'videos';
 type Feedback = { tone: 'success' | 'error'; text: string } | null;
 
 function cleanId(value: string) {
@@ -67,6 +68,7 @@ function MemberEditor({
   const [active, setActive] = useState(member.active);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
+  const memberStatus = !active ? 'Inactive' : member.last_sign_in_at ? 'Active' : 'Invited';
 
   async function sendAccessLink() {
     setBusy(true);
@@ -106,7 +108,7 @@ function MemberEditor({
           <h3>{member.display_name}{isSelf ? ' · You' : ''}</h3>
           <p className="muted admin-email">{member.email}</p>
         </div>
-        <span className="status-dot" data-active={active}>{active ? 'Active' : 'Inactive'}</span>
+        <span className="status-dot" data-status={memberStatus.toLowerCase()}>{memberStatus}</span>
       </div>
       <div className="admin-form-grid">
         <div className="admin-wide"><label htmlFor={`name-${member.id}`}>Display name</label><input id={`name-${member.id}`} value={name} maxLength={50} onChange={(event) => setName(event.target.value)} /></div>
@@ -119,7 +121,7 @@ function MemberEditor({
       </div>
       <div className="admin-button-row">
         <button className="btn-water" disabled={busy || name.trim().length < 2} onClick={save}>{busy ? 'Saving…' : 'Save member'}</button>
-        <button className="btn-ghost" disabled={busy} onClick={sendAccessLink}>Send access link</button>
+        <button className="btn-ghost" disabled={busy} onClick={sendAccessLink}>{member.last_sign_in_at ? 'Send access link' : 'Resend invitation'}</button>
       </div>
       {feedback && <p className="settings-feedback muted" data-tone={feedback.tone}>{feedback.text}</p>}
     </article>
@@ -266,8 +268,6 @@ export default function AdminPanel({
   const [videos, setVideos] = useState(initialVideos);
   const [newChallenge, setNewChallenge] = useState({ id: '', name: '', kind: 'reps' as Challenge['kind'], target: '25' });
   const [newVideo, setNewVideo] = useState({ title: '', url: '', challengeId: '', sortOrder: '0' });
-  const [newCode, setNewCode] = useState('');
-  const [confirmCode, setConfirmCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [invite, setInvite] = useState({ name: '', email: '' });
@@ -320,7 +320,9 @@ export default function AdminPanel({
       return;
     }
     setInvite({ name: '', email: '' });
-    setFeedback({ tone: 'success', text: `Invitation sent to ${email}. Refresh to see the new account.` });
+    const refreshed = await supabase.rpc('admin_list_members');
+    if (refreshed.data) setMembers(refreshed.data as MemberAdmin[]);
+    setFeedback({ tone: 'success', text: `Invitation sent to ${email}. They only need to open the email and tap once.` });
   }
 
   async function deleteMember(member: MemberAdmin) {
@@ -345,29 +347,16 @@ export default function AdminPanel({
     setFeedback({ tone: 'success', text: 'Video added.' });
   }
 
-  async function changeCode() {
-    if (newCode !== confirmCode || newCode.trim().length < 8) {
-      setFeedback({ tone: 'error', text: 'Codes must match and contain at least 8 characters.' });
-      return;
-    }
-    if (!window.confirm('Replace the current registration code? The old code will stop working immediately.')) return;
-    setBusy(true); setFeedback(null);
-    const { error } = await supabase.rpc('admin_update_invite_code', { new_code: newCode.trim() });
-    setBusy(false);
-    if (error) { setFeedback({ tone: 'error', text: error.message || 'Code could not be changed.' }); return; }
-    setNewCode(''); setConfirmCode('');
-    setFeedback({ tone: 'success', text: 'Group registration code changed.' });
-  }
-
   return (
     <main className="wrap admin-page">
-      <p className="eyebrow">Administrator only</p>
-      <h1 className="display">Manage group</h1>
+      <Link href="/settings" className="admin-back">← Back to Settings</Link>
+      <p className="eyebrow">Athletic Challenge · Administrator only</p>
+      <h1 className="display">Athletic Challenge Admin</h1>
       <p className="muted admin-intro">Changes take effect for the whole Athletic Challenge group.</p>
 
       <nav className="admin-tabs" aria-label="Administration sections">
         {([
-          ['members', 'Members'], ['challenges', 'Challenges'], ['videos', 'Videos'], ['code', 'Group code'],
+          ['members', 'Members'], ['challenges', 'Challenges'], ['videos', 'Videos'],
         ] as [Section, string][]).map(([key, label]) => (
           <button key={key} data-on={section === key} onClick={() => { setSection(key); setFeedback(null); }}>{label}</button>
         ))}
@@ -379,6 +368,7 @@ export default function AdminPanel({
         <div className="section-heading"><div><p className="eyebrow">Access and roles</p><h2>{members.length} members</h2></div></div>
         <article className="admin-card admin-create-card">
           <h3>Invite member</h3>
+          <p className="muted admin-help">They will receive a private email invitation. One tap opens Athletic Challenge; there is no registration form, group code or password.</p>
           <div className="admin-form-grid"><div><label>Name</label><input value={invite.name} maxLength={50} onChange={(event) => setInvite((value) => ({ ...value, name: event.target.value }))} /></div><div><label>Email</label><input type="email" value={invite.email} onChange={(event) => setInvite((value) => ({ ...value, email: event.target.value }))} /></div></div>
           <button className="btn-water admin-save" disabled={busy || invite.name.trim().length < 2 || !invite.email.includes('@')} onClick={inviteMember}>Send invitation</button>
         </article>
@@ -397,10 +387,6 @@ export default function AdminPanel({
         {videos.length ? <div className="admin-list">{videos.map((video) => <VideoEditor key={video.id} video={video} challenges={challenges} onSaved={replaceVideo} onDeleted={(id) => setVideos((items) => items.filter((item) => item.id !== id))} />)}</div> : <p className="empty">No videos have been added yet.</p>}
       </section>}
 
-      {section === 'code' && <section>
-        <div className="section-heading"><div><p className="eyebrow">Self-registration</p><h2>Group code</h2></div></div>
-        <article className="admin-card"><p className="muted">Choose a code between 8 and 64 characters. The app stores only an encrypted fingerprint, so the current code cannot be displayed.</p><div className="admin-form-grid code-fields"><div className="admin-wide"><label>New group code</label><input type="password" autoComplete="new-password" value={newCode} onChange={(event) => setNewCode(event.target.value)} /></div><div className="admin-wide"><label>Confirm new code</label><input type="password" autoComplete="new-password" value={confirmCode} onChange={(event) => setConfirmCode(event.target.value)} /></div></div><button className="btn-rope admin-save" disabled={busy || newCode.length < 8 || newCode !== confirmCode} onClick={changeCode}>{busy ? 'Changing…' : 'Replace group code'}</button><p className="muted admin-help">Existing members remain signed in. Only future registrations use the new code.</p></article>
-      </section>}
     </main>
   );
 }
