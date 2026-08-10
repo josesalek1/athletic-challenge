@@ -744,6 +744,78 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 .campaign-select-card { margin-bottom: 13px; padding: 13px; border: 1px solid var(--line); border-radius: var(--r); background: var(--tile); }
 .campaign-admin-card .admin-toggle { margin-top: 2px; }
 .code-fields { margin-top: 14px; }
+.activity-creator-heading { align-items: flex-start; margin-bottom: 4px; }
+.activity-ai-box {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--water) 70%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--water) 6%, var(--deep));
+}
+.activity-ai-box textarea { resize: vertical; }
+.activity-ai-button { width: 100%; color: var(--water); border-color: var(--water); }
+.activity-form-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 14px;
+  color: var(--mist);
+  font: 9px var(--data);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.activity-form-divider::before, .activity-form-divider::after { height: 1px; flex: 1; background: var(--line); content: ''; }
+.activity-auto-id {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 13px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--mist);
+  font: 9px var(--data);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.activity-auto-id strong { overflow: hidden; color: var(--chalk); font-size: 10px; text-overflow: ellipsis; text-transform: none; white-space: nowrap; }
+.activity-confirm-preview {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--water);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--water) 7%, var(--deep));
+}
+.activity-preview-top span, .activity-preview-top strong, .activity-preview-top small { display: block; }
+.activity-preview-top span { color: var(--water); font: 9px var(--data); letter-spacing: .08em; text-transform: uppercase; }
+.activity-preview-top strong { margin-top: 5px; font-size: 20px; }
+.activity-preview-top small { overflow-wrap: anywhere; margin-top: 5px; color: var(--mist); }
+.activity-preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
+.activity-preview-grid div { min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 9px; }
+.activity-preview-grid dt { color: var(--mist); font: 8px var(--data); letter-spacing: .06em; text-transform: uppercase; }
+.activity-preview-grid dd { overflow-wrap: anywhere; margin-top: 4px; color: var(--chalk); font-size: 11px; }
+.activity-confirm-preview > p { margin-top: 13px; color: var(--mist); font-size: 12px; line-height: 1.5; }
+.activity-preview-list { display: grid; gap: 7px; margin: 13px 0 0 18px; color: var(--chalk); font-size: 11px; }
+.activity-preview-list li { padding-left: 3px; }
+.activity-preview-list span { display: block; margin-top: 2px; color: var(--mist); }
+.activity-confirm-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 15px 0 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--chalk);
+  font: 12px/1.45 var(--body);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.activity-confirm-check input { width: 19px; height: 19px; flex: 0 0 19px; accent-color: var(--water); }
+.activity-confirm-actions { grid-template-columns: auto 1fr; }
 
 /* Offline queue and fallback -------------------------------- */
 .offline-status {

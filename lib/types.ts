@@ -11,7 +11,19 @@ export type Challenge = {
   campaign_id: string;
   name: string;
   kind: 'timed' | 'reps' | 'checklist' | 'done';
-  category: 'yogic' | 'traditional';
+  category:
+    | 'yogic'
+    | 'calisthenics'
+    | 'strength'
+    | 'hiit'
+    | 'cardio'
+    | 'mobility'
+    | 'swimming'
+    | 'running'
+    | 'recovery'
+    | 'mindfulness'
+    | 'traditional'
+    | 'other';
   started_on?: string;
   config: {
     target_s?: number;

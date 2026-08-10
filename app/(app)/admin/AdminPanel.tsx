@@ -8,9 +8,114 @@ import type { MemberAdmin, VideoAdmin } from './page';
 
 type Section = 'members' | 'campaigns' | 'activities' | 'videos';
 type Feedback = { tone: 'success' | 'error'; text: string } | null;
+type ActivityDraft = {
+  name: string;
+  kind: Challenge['kind'];
+  category: Challenge['category'];
+  target: string;
+  description: string;
+  checklistText: string;
+};
+
+const ACTIVITY_CATEGORIES: { value: Challenge['category']; label: string }[] = [
+  { value: 'yogic', label: 'Yoga & yogic practices' },
+  { value: 'calisthenics', label: 'Calisthenics' },
+  { value: 'strength', label: 'Strength' },
+  { value: 'hiit', label: 'HIIT' },
+  { value: 'cardio', label: 'Cardio' },
+  { value: 'mobility', label: 'Mobility' },
+  { value: 'swimming', label: 'Swimming' },
+  { value: 'running', label: 'Running' },
+  { value: 'recovery', label: 'Recovery' },
+  { value: 'mindfulness', label: 'Mindfulness' },
+  { value: 'traditional', label: 'Traditional' },
+  { value: 'other', label: 'Other' },
+];
+
+const EMPTY_ACTIVITY: ActivityDraft = {
+  name: '',
+  kind: 'reps',
+  category: 'calisthenics',
+  target: '25',
+  description: '',
+  checklistText: '',
+};
 
 function cleanId(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function activityIdFor(name: string, campaignId: string, challenges: Challenge[]) {
+  const base = cleanId(name) || 'activity';
+  if (!challenges.some((challenge) => challenge.id === base)) return base;
+  const campaignSuffix = campaignId.slice(0, 6) || 'new';
+  let candidate = `${base}-${campaignSuffix}`;
+  let number = 2;
+  while (challenges.some((challenge) => challenge.id === candidate)) {
+    candidate = `${base}-${campaignSuffix}-${number}`;
+    number += 1;
+  }
+  return candidate;
+}
+
+function normalizeWords(value: string) {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function titleCase(value: string) {
+  return value.replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+}
+
+function localActivityDraft(prompt: string): ActivityDraft {
+  const normalized = normalizeWords(prompt);
+  const firstNumber = Number(normalized.match(/\b\d+\b/)?.[0] ?? 1);
+  const checklist = /checklist|lista|practicas|practices|selecciona|choose/.test(normalized);
+  const timed = /segundo|second|minuto|minute|tiempo|timed|hold|plank/.test(normalized);
+  const binary = /si\s*\/\s*no|yes\s*\/\s*no|completar|complete|done/.test(normalized);
+  const kind: Challenge['kind'] = checklist ? 'checklist' : timed ? 'timed' : binary ? 'done' : 'reps';
+
+  let category: Challenge['category'] = 'traditional';
+  if (/yoga|yogic|pranayama|meditacion|meditation/.test(normalized)) category = 'yogic';
+  else if (/nadar|natacion|swim/.test(normalized)) category = 'swimming';
+  else if (/correr|running|run\b|jog/.test(normalized)) category = 'running';
+  else if (/hiit|tabata|interval/.test(normalized)) category = 'hiit';
+  else if (/fuerza|strength|peso|weight|deadlift|press|squat/.test(normalized)) category = 'strength';
+  else if (/calistenia|calisthenics|push.?up|pull.?up|burpee/.test(normalized)) category = 'calisthenics';
+  else if (/movilidad|mobility|stretch|estiramiento/.test(normalized)) category = 'mobility';
+  else if (/recuperacion|recovery|descanso|rest day/.test(normalized)) category = 'recovery';
+  else if (/respiracion|breath|mindful/.test(normalized)) category = 'mindfulness';
+  else if (/cardio|ciclismo|cycling|bike|walk|caminar/.test(normalized)) category = 'cardio';
+
+  const knownName = /push.?up/.test(normalized) ? 'Push-ups'
+    : /pull.?up/.test(normalized) ? 'Pull-ups'
+    : /squat/.test(normalized) ? 'Squats'
+    : /plank/.test(normalized) ? 'Plank'
+    : /hiit|tabata/.test(normalized) ? 'HIIT'
+    : /nadar|natacion|swim/.test(normalized) ? 'Swimming'
+    : /correr|running|run\b|jog/.test(normalized) ? 'Running'
+    : /yoga|yogic/.test(normalized) ? 'Yogic practice'
+    : '';
+  const rawName = prompt.split(/[.!?\n:]/)[0]
+    .replace(/^(crea|crear|create|add|agrega|anade)\s+(una?\s+)?(actividad\s+|reto\s+|challenge\s+)?/i, '')
+    .replace(/\b(de|for|with|con)\s+\d+.*$/i, '')
+    .trim();
+  const name = knownName || titleCase(rawName.slice(0, 60)) || 'New activity';
+
+  const minutes = /minuto|minute/.test(normalized);
+  const numericTarget = kind === 'done' ? 1 : Math.max(1, firstNumber * (kind === 'timed' && minutes ? 60 : 1));
+  const listSource = prompt.includes(':') ? prompt.split(':').slice(1).join(':') : '';
+  const listItems = checklist
+    ? listSource.split(/[,;\n]/).map((item) => item.trim()).filter(Boolean).slice(0, 12)
+    : [];
+
+  return {
+    name,
+    kind,
+    category,
+    target: String(checklist && listItems.length ? Math.min(firstNumber || 3, listItems.length) : numericTarget),
+    description: prompt.trim().slice(0, 220),
+    checklistText: listItems.map((item) => `${titleCase(item)} |`).join('\n'),
+  };
 }
 
 function checklistToText(challenge: Challenge) {
@@ -253,7 +358,7 @@ function ChallengeEditor({ challenge, onSaved }: { challenge: Challenge; onSaved
       <div className="admin-form-grid">
         <div className="admin-wide"><label>Name</label><input value={name} maxLength={60} onChange={(event) => setName(event.target.value)} /></div>
         <div><label>Type</label><select value={kind} onChange={(event) => setKind(event.target.value as Challenge['kind'])}><option value="reps">Repetitions</option><option value="timed">Timed</option><option value="done">Done / not done</option><option value="checklist">Checklist</option></select></div>
-        <div><label>Category</label><select value={category} onChange={(event) => setCategory(event.target.value as Challenge['category'])}><option value="traditional">Traditional</option><option value="yogic">Yogic</option></select></div>
+        <div><label>Category</label><select value={category} onChange={(event) => setCategory(event.target.value as Challenge['category'])}>{ACTIVITY_CATEGORIES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
         <div><label>{targetLabel}</label><input type="number" min="1" disabled={kind === 'done'} value={target} onChange={(event) => setTarget(event.target.value)} /></div>
         <div><label>Order</label><input type="number" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)} /></div>
         <label className="admin-toggle admin-wide"><input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} /><span>Activity enabled in Today</span></label>
@@ -343,11 +448,18 @@ export default function AdminPanel({
   const [selectedCampaignId, setSelectedCampaignId] = useState(activeCampaign?.id ?? '');
   const initialDate = new Date().toISOString().slice(0, 10);
   const [newCampaign, setNewCampaign] = useState({ name: '', description: '', startsOn: initialDate, endsOn: addDays(initialDate, 29), active: false });
-  const [newChallenge, setNewChallenge] = useState({ name: '', kind: 'reps' as Challenge['kind'], target: '25' });
+  const [activityDraft, setActivityDraft] = useState<ActivityDraft>(EMPTY_ACTIVITY);
+  const [activityPrompt, setActivityPrompt] = useState('');
+  const [activityPreview, setActivityPreview] = useState<ActivityDraft | null>(null);
+  const [activityConfirmed, setActivityConfirmed] = useState(false);
   const [newVideo, setNewVideo] = useState({ title: '', url: '', challengeId: '', sortOrder: '0' });
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [invite, setInvite] = useState({ name: '', email: '' });
+  const selectedCampaign = campaigns.find((campaign) => campaign.id === selectedCampaignId);
+  const previewActivityId = activityPreview && selectedCampaign
+    ? activityIdFor(activityPreview.name, selectedCampaign.id, challenges)
+    : '';
 
   function replaceMember(next: MemberAdmin) { setMembers((items) => items.map((item) => item.id === next.id ? next : item)); }
   function replaceCampaign(next: Campaign) {
@@ -358,6 +470,12 @@ export default function AdminPanel({
   }
   function replaceChallenge(next: Challenge) { setChallenges((items) => items.map((item) => item.id === next.id ? next : item).sort((a, b) => a.sort_order - b.sort_order)); }
   function replaceVideo(next: VideoAdmin) { setVideos((items) => items.map((item) => item.id === next.id ? next : item).sort((a, b) => a.sort_order - b.sort_order)); }
+
+  function updateActivityDraft(patch: Partial<ActivityDraft>) {
+    setActivityDraft((value) => ({ ...value, ...patch }));
+    setActivityPreview(null);
+    setActivityConfirmed(false);
+  }
 
   async function createCampaign() {
     setBusy(true); setFeedback(null);
@@ -378,29 +496,65 @@ export default function AdminPanel({
     setFeedback({ tone: 'success', text: created.active ? 'Campaign created and activated.' : 'Campaign created. Add its activities before activating it.' });
   }
 
+  function generateActivityDraft() {
+    const prompt = activityPrompt.trim();
+    if (prompt.length < 8) {
+      setFeedback({ tone: 'error', text: 'Describe the activity in a little more detail first.' });
+      return;
+    }
+    const localDraft = localActivityDraft(prompt);
+    setFeedback(null);
+    setActivityDraft(localDraft);
+    setActivityPreview(null);
+    setActivityConfirmed(false);
+    setFeedback({ tone: 'success', text: 'Draft prepared with the private built-in assistant. Review every field before continuing.' });
+  }
+
+  function reviewActivity() {
+    const selectedCampaign = campaigns.find((campaign) => campaign.id === selectedCampaignId);
+    if (!selectedCampaign) {
+      setFeedback({ tone: 'error', text: 'Select a campaign first.' });
+      return;
+    }
+    if (activityDraft.name.trim().length < 2) {
+      setFeedback({ tone: 'error', text: 'Add a name with at least two characters.' });
+      return;
+    }
+    if (activityDraft.kind === 'checklist' && checklistFromText(activityDraft.checklistText).length < 1) {
+      setFeedback({ tone: 'error', text: 'A checklist needs at least one item.' });
+      return;
+    }
+    setActivityPreview({ ...activityDraft, name: activityDraft.name.trim(), description: activityDraft.description.trim() });
+    setActivityConfirmed(false);
+    setFeedback(null);
+  }
+
   async function createChallenge() {
     const selectedCampaign = campaigns.find((campaign) => campaign.id === selectedCampaignId);
-    const baseId = cleanId(newChallenge.name);
-    const id = challenges.some((challenge) => challenge.id === baseId) ? `${baseId}-${selectedCampaignId.slice(0, 6)}` : baseId;
-    if (!id || !newChallenge.name.trim() || !selectedCampaign) return;
+    const draft = activityPreview;
+    if (!draft || !activityConfirmed || !selectedCampaign) return;
+    const id = activityIdFor(draft.name, selectedCampaign.id, challenges);
     setBusy(true); setFeedback(null);
-    const target = Math.max(1, Number(newChallenge.target) || 1);
+    const target = Math.max(1, Number(draft.target) || 1);
     const challenge: Challenge = {
       id,
       campaign_id: selectedCampaign.id,
-      name: newChallenge.name.trim(),
-      kind: newChallenge.kind,
-      category: 'traditional',
-      config: challengeConfig({ id, campaign_id: selectedCampaign.id, name: '', kind: newChallenge.kind, category: 'traditional', config: {}, active: true, sort_order: 0 }, newChallenge.kind, target, '', newChallenge.kind === 'checklist' ? 'Practice 1 | Describe the practice' : undefined),
+      name: draft.name.trim(),
+      kind: draft.kind,
+      category: draft.category,
+      config: challengeConfig({ id, campaign_id: selectedCampaign.id, name: '', kind: draft.kind, category: draft.category, config: {}, active: true, sort_order: 0 }, draft.kind, target, draft.description, draft.kind === 'checklist' ? draft.checklistText : undefined),
       active: true,
-      sort_order: Math.max(0, ...challenges.map((item) => item.sort_order)) + 1,
+      sort_order: Math.max(0, ...challenges.filter((item) => item.campaign_id === selectedCampaign.id).map((item) => item.sort_order)) + 1,
       started_on: selectedCampaign.starts_on,
     };
     const { error } = await supabase.from('challenges').insert(challenge);
     setBusy(false);
     if (error) { setFeedback({ tone: 'error', text: error.message || 'Activity could not be created.' }); return; }
     setChallenges((items) => [...items, challenge]);
-    setNewChallenge({ name: '', kind: 'reps', target: '25' });
+    setActivityDraft(EMPTY_ACTIVITY);
+    setActivityPrompt('');
+    setActivityPreview(null);
+    setActivityConfirmed(false);
     setFeedback({ tone: 'success', text: `Activity added to ${selectedCampaign.name}.` });
   }
 
@@ -502,16 +656,48 @@ export default function AdminPanel({
         <div className="section-heading"><div><p className="eyebrow">Campaign content</p><h2>Activities</h2></div></div>
         <div className="campaign-select-card">
           <label htmlFor="activity-campaign">Campaign</label>
-          <select id="activity-campaign" value={selectedCampaignId} onChange={(event) => setSelectedCampaignId(event.target.value)}>
+          <select id="activity-campaign" value={selectedCampaignId} onChange={(event) => { setSelectedCampaignId(event.target.value); setActivityPreview(null); setActivityConfirmed(false); }}>
             {campaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.active ? '● ' : ''}{campaign.name} · {campaign.duration_days} days</option>)}
           </select>
         </div>
         {selectedCampaignId ? <>
           <article className="admin-card admin-create-card">
-            <h3>Add activity</h3>
-            <p className="muted admin-help">Activities belong permanently to the selected campaign so its history stays accurate.</p>
-            <div className="admin-form-grid"><div className="admin-wide"><label>Name</label><input placeholder="Pull-ups" value={newChallenge.name} onChange={(event) => setNewChallenge((value) => ({ ...value, name: event.target.value }))} /></div><div><label>Type</label><select value={newChallenge.kind} onChange={(event) => setNewChallenge((value) => ({ ...value, kind: event.target.value as Challenge['kind'] }))}><option value="reps">Repetitions</option><option value="timed">Timed</option><option value="done">Done / not done</option><option value="checklist">Checklist</option></select></div><div><label>Goal</label><input type="number" min="1" disabled={newChallenge.kind === 'done'} value={newChallenge.target} onChange={(event) => setNewChallenge((value) => ({ ...value, target: event.target.value }))} /></div></div>
-            <button className="btn-water admin-save" disabled={busy || !newChallenge.name.trim()} onClick={createChallenge}>Add activity</button>
+            <div className="between activity-creator-heading">
+              <div><p className="eyebrow">{activityPreview ? 'Step 2 of 2' : 'Step 1 of 2'}</p><h3>{activityPreview ? 'Confirm activity' : 'Create activity'}</h3></div>
+              <span className="status-dot" data-status={activityPreview ? 'active' : 'invited'}>{activityPreview ? 'Preview' : 'Draft'}</span>
+            </div>
+            {!activityPreview ? <>
+              <p className="muted admin-help">Describe the activity in your own words or complete the guided fields. The ID is generated automatically.</p>
+              <div className="activity-ai-box">
+                <label htmlFor="activity-prompt">Optional · describe it naturally</label>
+                <textarea id="activity-prompt" rows={4} maxLength={1000} placeholder="Example: Create a 90-second plank for the strength category. Keep the core tight and hips level." value={activityPrompt} onChange={(event) => setActivityPrompt(event.target.value)} />
+                <button className="btn-ghost activity-ai-button" disabled={activityPrompt.trim().length < 8} onClick={generateActivityDraft}>Generate guided draft</button>
+              </div>
+              <div className="activity-form-divider"><span>Or configure manually</span></div>
+              <div className="admin-form-grid">
+                <div className="admin-wide"><label htmlFor="activity-name">Name</label><input id="activity-name" placeholder="Pull-ups" maxLength={60} value={activityDraft.name} onChange={(event) => updateActivityDraft({ name: event.target.value })} /></div>
+                <div><label htmlFor="activity-type">Type</label><select id="activity-type" value={activityDraft.kind} onChange={(event) => updateActivityDraft({ kind: event.target.value as Challenge['kind'] })}><option value="reps">Repetitions</option><option value="timed">Timed</option><option value="done">Done / not done</option><option value="checklist">Checklist</option></select></div>
+                <div><label htmlFor="activity-category">Category</label><select id="activity-category" value={activityDraft.category} onChange={(event) => updateActivityDraft({ category: event.target.value as Challenge['category'] })}>{ACTIVITY_CATEGORIES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
+                <div><label htmlFor="activity-goal">{activityDraft.kind === 'timed' ? 'Goal · seconds' : activityDraft.kind === 'checklist' ? 'Items required' : activityDraft.kind === 'done' ? 'Goal' : 'Goal · reps'}</label><input id="activity-goal" type="number" min="1" disabled={activityDraft.kind === 'done'} value={activityDraft.target} onChange={(event) => updateActivityDraft({ target: event.target.value })} /></div>
+                <div className="admin-wide"><label htmlFor="activity-description">Description</label><textarea id="activity-description" rows={3} maxLength={220} placeholder="Give members a short, useful instruction." value={activityDraft.description} onChange={(event) => updateActivityDraft({ description: event.target.value })} /></div>
+              </div>
+              {activityDraft.kind === 'checklist' && <div className="checklist-admin-field"><label htmlFor="activity-checklist">Checklist · one item per line, using Name | Hint</label><textarea id="activity-checklist" rows={6} placeholder={'Pranayama | Five minutes before coffee\nNature | Spend twenty minutes outside'} value={activityDraft.checklistText} onChange={(event) => updateActivityDraft({ checklistText: event.target.value })} /></div>}
+              <div className="activity-auto-id"><span>Automatic ID</span><strong className="num">{activityIdFor(activityDraft.name, selectedCampaignId, challenges)}</strong></div>
+              <button className="btn-water admin-save" disabled={busy || activityDraft.name.trim().length < 2} onClick={reviewActivity}>Review activity</button>
+            </> : <>
+              <p className="muted admin-help">Nothing has been saved yet. Verify the activity and campaign before confirming.</p>
+              <div className="activity-confirm-preview">
+                <div className="activity-preview-top"><span>{ACTIVITY_CATEGORIES.find((option) => option.value === activityPreview.category)?.label}</span><strong>{activityPreview.name}</strong><small className="num">{previewActivityId}</small></div>
+                <dl className="activity-preview-grid">
+                  <div><dt>Campaign</dt><dd>{selectedCampaign?.name}</dd></div>
+                  <div><dt>Type</dt><dd>{activityPreview.kind === 'reps' ? `${activityPreview.target} repetitions` : activityPreview.kind === 'timed' ? `${activityPreview.target} seconds` : activityPreview.kind === 'checklist' ? `${activityPreview.target} required of ${checklistFromText(activityPreview.checklistText).length}` : 'Done / not done'}</dd></div>
+                </dl>
+                {activityPreview.description && <p>{activityPreview.description}</p>}
+                {activityPreview.kind === 'checklist' && <ol className="activity-preview-list">{checklistFromText(activityPreview.checklistText).map((item) => <li key={item.key}><strong>{item.name}</strong>{item.hint && <span>{item.hint}</span>}</li>)}</ol>}
+              </div>
+              <label className="activity-confirm-check"><input type="checkbox" checked={activityConfirmed} onChange={(event) => setActivityConfirmed(event.target.checked)} /><span>I reviewed this activity and want to add it to {selectedCampaign?.name}.</span></label>
+              <div className="admin-button-row activity-confirm-actions"><button className="btn-ghost" disabled={busy} onClick={() => { setActivityPreview(null); setActivityConfirmed(false); }}>Back to edit</button><button className="btn-water" disabled={busy || !activityConfirmed} onClick={createChallenge}>{busy ? 'Creating…' : 'Confirm and create'}</button></div>
+            </>}
           </article>
           <div className="admin-list">
             {challenges.filter((challenge) => challenge.campaign_id === selectedCampaignId).map((challenge) => <ChallengeEditor key={challenge.id} challenge={challenge} onSaved={replaceChallenge} />)}
