@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { validChecklistDone } from '@/lib/checklist';
 import type { Challenge } from '@/lib/types';
 
@@ -8,10 +9,12 @@ export default function Checklist({
   challenge,
   initialDone,
   onSave,
+  footer,
 }: {
   challenge: Challenge;
   initialDone: string[];
   onSave: (done: string[]) => Promise<void>;
+  footer?: ReactNode;
 }) {
   const items = challenge.config.items ?? [];
   const goal = challenge.config.daily_goal ?? 3;
@@ -73,6 +76,7 @@ export default function Checklist({
               onClick={save} disabled={!dirty || saving}>
         {saving ? 'Saving…' : dirty ? 'Save' : 'Saved'}
       </button>
+      {footer}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import Stopwatch from '@/components/Stopwatch';
 import Checklist from '@/components/Checklist';
@@ -29,7 +31,17 @@ export default function TodayBoard({
   const [local, setLocal] = useState<Record<string, Payload>>(
     Object.fromEntries(entries.map((e) => [e.challenge_id, e.payload]))
   );
-  const [section, setSection] = useState(challenges[0]?.id ?? '');
+  const groupChallenges = useMemo(
+    () => challenges.filter((challenge) => challenge.visibility === 'group'),
+    [challenges]
+  );
+  const [habits, setHabits] = useState(() =>
+    challenges.filter((challenge) => challenge.visibility === 'private')
+  );
+  const [groupSection, setGroupSection] = useState(groupChallenges[0]?.id ?? '');
+  const [habitSection, setHabitSection] = useState(habits[0]?.id ?? '');
+  const [busy, setBusy] = useState(false);
+  const [habitFeedback, setHabitFeedback] = useState('');
 
   useEffect(() => {
     void queuedEntries(userId, day).then((queued) => {
@@ -41,7 +53,7 @@ export default function TodayBoard({
     });
   }, [day, userId]);
 
-  // Campaign day is shared by the whole group and comes from its start date.
+  // El día de campaña es común al grupo y parte de su fecha inicial.
   const dayNumber = useMemo(() => {
     if (!campaign) return 1;
     const ms =
@@ -86,28 +98,66 @@ export default function TodayBoard({
     }
   }
 
-  const current = challenges.find((c) => c.id === section);
+  const currentGroup = groupChallenges.find((challenge) => challenge.id === groupSection);
+  const currentHabit = habits.find((challenge) => challenge.id === habitSection);
 
-  const results = challenges
+  const results = groupChallenges
     .map((challenge) => ({ challenge, payload: local[challenge.id] ?? {} }))
     .filter(({ payload }) => isLogged(payload));
 
   const line = dayLine(dayNumber, results);
 
-  function render(c: Challenge) {
+  async function deleteHabit(habit: Challenge) {
+    if (busy) return;
+    const confirmed = window.confirm(
+      `Delete “${habit.name}”? Its complete history will be permanently lost.`
+    );
+    if (!confirmed) return;
+
+    setBusy(true);
+    setHabitFeedback('');
+    const { error } = await supabase.from('challenges').delete().eq('id', habit.id);
+    setBusy(false);
+
+    if (error) {
+      setHabitFeedback('The habit could not be deleted. Refresh the app and try again.');
+      return;
+    }
+
+    const remaining = habits.filter((item) => item.id !== habit.id);
+    setHabits(remaining);
+    setHabitSection((current) => current === habit.id ? remaining[0]?.id ?? '' : current);
+    setLocal((current) => {
+      const next = { ...current };
+      delete next[habit.id];
+      return next;
+    });
+    setHabitFeedback('Habit deleted.');
+  }
+
+  function habitActions(habit: Challenge) {
+    return (
+      <div className="habit-card-actions">
+        <Link className="btn btn-ghost" href={`/hoy/habits/${habit.id}`}>Edit habit</Link>
+        <button className="btn-ghost" disabled={busy} onClick={() => deleteHabit(habit)}>Delete habit</button>
+      </div>
+    );
+  }
+
+  function render(c: Challenge, footer?: ReactNode) {
     const p = local[c.id] ?? {};
     if (c.kind === 'timed')
       return <Stopwatch challenge={c} initialSeconds={p.seconds}
                         onSave={(seconds) => save(c.id, { seconds })}
-                        onClear={() => save(c.id, {})} />;
+                        onClear={() => save(c.id, {})} footer={footer} />;
     if (c.kind === 'reps')
       return <RepsCounter challenge={c} initialReps={p.reps ?? 0}
-                          onSave={(reps) => save(c.id, { reps })} />;
+                          onSave={(reps) => save(c.id, { reps })} footer={footer} />;
     if (c.kind === 'done')
       return <DoneToggle challenge={c} initialDone={Boolean(p.ok)}
-                         onSave={(ok) => save(c.id, { ok })} />;
+                         onSave={(ok) => save(c.id, { ok })} footer={footer} />;
     return <Checklist challenge={c} initialDone={p.done ?? []}
-                      onSave={(done) => save(c.id, { done })} />;
+                      onSave={(done) => save(c.id, { done })} footer={footer} />;
   }
 
   return (
@@ -132,56 +182,92 @@ export default function TodayBoard({
         </section>
       )}
 
-      {!campaign ? (
-        <p className="empty">There is no active campaign. Ask an administrator to activate one.</p>
-      ) : !campaignLive ? (
-        <p className="empty">
-          {campaignState === 'upcoming'
-            ? `This campaign begins on ${campaign.starts_on}.`
-            : `This campaign ended on ${campaign.ends_on}. Your history remains available in Progress.`}
-        </p>
-      ) : challenges.length === 0 ? (
-        <p className="empty">
-          This campaign has no active activities.
-          <br />
-          Ask an administrator to activate one from the Admin panel.
-        </p>
-      ) : (
-        <>
-          <div className="chips" role="tablist">
-            {challenges.map((c) => (
-              <button key={c.id} className="chip" role="tab"
-                      data-on={c.id === section}
-                      data-logged={isLogged(local[c.id])}
-                      aria-selected={c.id === section}
-                      onClick={() => setSection(c.id)}>
-                {c.name}
-              </button>
-            ))}
-          </div>
+      <section className="today-section" aria-labelledby="group-challenge-heading">
+        <p className="eyebrow today-section-label" id="group-challenge-heading">Group challenge</p>
+        {!campaign ? (
+          <p className="empty">There is no active campaign. Ask an administrator to activate one.</p>
+        ) : !campaignLive ? (
+          <p className="empty">
+            {campaignState === 'upcoming'
+              ? `This campaign begins on ${campaign.starts_on}.`
+              : `This campaign ended on ${campaign.ends_on}. Your history remains available in Progress.`}
+          </p>
+        ) : groupChallenges.length === 0 ? (
+          <p className="empty">
+            This campaign has no active activities.
+            <br />
+            Ask an administrator to activate one from the Admin panel.
+          </p>
+        ) : (
+          <>
+            <div className="chips" role="tablist" aria-label="Group challenge activities">
+              {groupChallenges.map((challenge) => (
+                <button key={challenge.id} className="chip" role="tab"
+                        data-on={challenge.id === groupSection}
+                        data-logged={isLogged(local[challenge.id])}
+                        aria-selected={challenge.id === groupSection}
+                        onClick={() => setGroupSection(challenge.id)}>
+                  {challenge.name}
+                </button>
+              ))}
+            </div>
 
-          {current && render(current)}
+            {currentGroup && render(currentGroup)}
 
-          <div className="card">
-            <div className="between" style={{ marginBottom: 10 }}>
-              <p className="eyebrow">Group report</p>
-              <p className="num" style={{ fontSize: 12, color: 'var(--mist)' }}>
-                {results.length}/{challenges.length}
+            <div className="card">
+              <div className="between" style={{ marginBottom: 10 }}>
+                <p className="eyebrow">Group report</p>
+                <p className="num" style={{ fontSize: 12, color: 'var(--mist)' }}>
+                  {results.length}/{groupChallenges.length}
+                </p>
+              </div>
+              <p className="num" style={{ fontSize: 14, lineHeight: 1.6, marginBottom: 14 }}>
+                {line}
+              </p>
+              <a className="btn btn-water" style={{ width: '100%' }} href={waLink(line)}
+                 target="_blank" rel="noopener noreferrer">
+                Open in WhatsApp
+              </a>
+              <p className="muted" style={{ marginTop: 10 }}>
+                Pick the group and hit send. The text is already written.
               </p>
             </div>
-            <p className="num" style={{ fontSize: 14, lineHeight: 1.6, marginBottom: 14 }}>
-              {line}
-            </p>
-            <a className="btn btn-water" style={{ width: '100%' }} href={waLink(line)}
-               target="_blank" rel="noopener noreferrer">
-              Open in WhatsApp
-            </a>
-            <p className="muted" style={{ marginTop: 10 }}>
-              Pick the group and hit send. The text is already written.
-            </p>
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </section>
+
+      <section className="today-section habit-section" aria-labelledby="my-habits-heading">
+        <div className="between today-section-heading">
+          <p className="eyebrow today-section-label" id="my-habits-heading">My habits</p>
+          <Link className="btn btn-water new-habit-link" href="/hoy/habits/new">+ New habit</Link>
+        </div>
+
+        {habits.length === 0 ? (
+          <p className="empty">Create a private daily habit. Only you can see its results.</p>
+        ) : (
+          <>
+            <div className="chips" role="tablist" aria-label="My private habits">
+              {habits.map((habit) => (
+                <button key={habit.id} className="chip" role="tab"
+                        data-on={habit.id === habitSection}
+                        data-logged={isLogged(local[habit.id])}
+                        aria-selected={habit.id === habitSection}
+                        onClick={() => setHabitSection(habit.id)}>
+                  {habit.name}
+                </button>
+              ))}
+            </div>
+
+            {currentHabit && render(currentHabit, habitActions(currentHabit))}
+          </>
+        )}
+
+        {habitFeedback && (
+          <p className="settings-feedback" data-tone={habitFeedback === 'Habit deleted.' ? 'success' : 'error'}>
+            {habitFeedback}
+          </p>
+        )}
+      </section>
     </main>
   );
 }

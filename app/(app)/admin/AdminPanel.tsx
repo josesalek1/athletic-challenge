@@ -587,10 +587,12 @@ export default function AdminPanel({
     const challenge: Challenge = {
       id,
       campaign_id: selectedCampaign.id,
+      owner_id: null,
+      visibility: 'group',
       name: draft.name.trim(),
       kind: draft.kind,
       category: draft.category,
-      config: challengeConfig({ id, campaign_id: selectedCampaign.id, name: '', kind: draft.kind, category: draft.category, config: {}, active: true, sort_order: 0 }, draft.kind, target, draft.description, draft.kind === 'checklist' ? draft.checklistText : undefined),
+      config: challengeConfig({ id, campaign_id: selectedCampaign.id, owner_id: null, visibility: 'group', name: '', kind: draft.kind, category: draft.category, config: {}, active: true, sort_order: 0 }, draft.kind, target, draft.description, draft.kind === 'checklist' ? draft.checklistText : undefined),
       active: true,
       sort_order: Math.max(0, ...challenges.filter((item) => item.campaign_id === selectedCampaign.id).map((item) => item.sort_order)) + 1,
       started_on: selectedCampaign.starts_on,

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { mmss } from '@/lib/format';
 import type { Challenge } from '@/lib/types';
 
@@ -12,11 +13,13 @@ export default function Stopwatch({
   initialSeconds,
   onSave,
   onClear,
+  footer,
 }: {
   challenge: Challenge;
   initialSeconds?: number;
   onSave: (seconds: number) => Promise<void>;
   onClear: () => Promise<void>;
+  footer?: ReactNode;
 }) {
   const target = challenge.config.target_s ?? 0;
   const [elapsed, setElapsed] = useState(0);
@@ -121,6 +124,7 @@ export default function Stopwatch({
           <button className="btn-ghost" onClick={reset}>Reset</button>
         )}
       </div>
+      {footer}
     </div>
   );
 }

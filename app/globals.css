@@ -73,6 +73,34 @@ body {
 .campaign-summary[data-state='upcoming'] strong { color: #e1bb62; }
 .campaign-summary[data-state='finished'] { border-color: var(--line); }
 .campaign-summary[data-state='finished'] strong { color: var(--mist); }
+.today-section {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.today-section-label { margin-bottom: 12px; color: var(--water); }
+.today-section-heading { align-items: center; margin-bottom: 12px; }
+.today-section-heading .today-section-label { margin-bottom: 0; }
+.new-habit-link { padding: 9px 12px; font-size: 12px; }
+.habit-card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.habit-card-actions .btn,
+.habit-card-actions button { min-width: 0; padding: 10px 8px; color: var(--mist); font-size: 11px; }
+.habit-form-page { max-width: 560px; }
+.habit-form-title { margin: 8px 0 8px; font-size: clamp(38px, 11vw, 54px); }
+.habit-form-intro { margin-bottom: 18px; }
+.habit-form { display: grid; gap: 16px; }
+.habit-form textarea { resize: vertical; }
+.habit-field-count,
+.habit-field-help { display: block; margin-top: 5px; color: var(--mist); font-size: 9px; }
+.habit-field-count { text-align: right; }
+.habit-form-actions { display: grid; grid-template-columns: auto 1fr; gap: 8px; }
 
 /* Estructura ------------------------------------------------ */
 .wrap {

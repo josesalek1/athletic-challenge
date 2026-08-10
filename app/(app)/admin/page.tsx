@@ -42,7 +42,7 @@ export default async function AdminPage() {
   const [membersResult, campaignsResult, challengesResult, videosResult] = await Promise.all([
     supabase.rpc('admin_list_members'),
     supabase.from('campaigns').select('*').order('starts_on', { ascending: false }),
-    supabase.from('challenges').select('*').order('sort_order'),
+    supabase.from('challenges').select('*').eq('visibility', 'group').order('sort_order'),
     supabase.from('videos').select('id, challenge_id, title, url, description, created_by, status, sort_order, created_at').order('created_at', { ascending: false }),
   ]);
 

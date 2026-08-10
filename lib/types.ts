@@ -8,7 +8,9 @@ export type ChecklistItem = {
 
 export type Challenge = {
   id: string;
-  campaign_id: string;
+  campaign_id: string | null;
+  owner_id: string | null;
+  visibility: 'group' | 'private';
   name: string;
   kind: 'timed' | 'reps' | 'checklist' | 'done';
   category:

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import type { Challenge } from '@/lib/types';
 
 /* Hecho o no hecho. Sin número. */
@@ -9,10 +10,12 @@ export default function DoneToggle({
   challenge,
   initialDone,
   onSave,
+  footer,
 }: {
   challenge: Challenge;
   initialDone: boolean;
   onSave: (done: boolean) => Promise<void>;
+  footer?: ReactNode;
 }) {
   const [on, setOn] = useState(initialDone);
   const [saving, setSaving] = useState(false);
@@ -40,6 +43,7 @@ export default function DoneToggle({
       >
         {on ? 'Done today ✓' : 'Mark as done'}
       </button>
+      {footer}
     </div>
   );
 }

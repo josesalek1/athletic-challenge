@@ -19,13 +19,27 @@ export default async function Hoy() {
     .eq('active', true)
     .maybeSingle();
 
-  const [{ data: challenges }, { data: entries }, { data: profile }] = await Promise.all([
+  const [groupResult, habitsResult, { data: entries }, { data: profile }] = await Promise.all([
     campaign
-      ? supabase.from('challenges').select('*').eq('campaign_id', campaign.id).eq('active', true).order('sort_order')
+      ? supabase
+          .from('challenges')
+          .select('*')
+          .eq('campaign_id', campaign.id)
+          .eq('visibility', 'group')
+          .eq('active', true)
+          .order('sort_order')
       : Promise.resolve({ data: [] }),
-    supabase.from('entries').select('*').eq('user_id', user!.id).eq('day', day),
+    supabase
+      .from('challenges')
+      .select('*')
+      .eq('visibility', 'private')
+      .eq('active', true)
+      .order('sort_order'),
+    supabase.from('entries').select('*').eq('day', day),
     supabase.from('profiles').select('display_name').eq('id', user!.id).single(),
   ]);
+
+  const challenges = [...(groupResult.data ?? []), ...(habitsResult.data ?? [])];
 
   return (
     <TodayBoard

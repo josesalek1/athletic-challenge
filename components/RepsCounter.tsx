@@ -1,18 +1,21 @@
 'use client';
 
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import type { Challenge } from '@/lib/types';
 
 export default function RepsCounter({
   challenge,
   initialReps,
   onSave,
+  footer,
 }: {
   challenge: Challenge;
   initialReps: number;
   onSave: (reps: number) => Promise<void>;
+  footer?: ReactNode;
 }) {
-  const target = challenge.config.target ?? 25;
+  const target = challenge.config.target ?? (challenge.visibility === 'private' ? 0 : 25);
   const [reps, setReps] = useState(initialReps);
   const [saved, setSaved] = useState(initialReps);
   const [saving, setSaving] = useState(false);
@@ -30,8 +33,8 @@ export default function RepsCounter({
       <div className="between" style={{ marginBottom: 4 }}>
         <p className="eyebrow">{challenge.name}</p>
         <p className="num" style={{ fontSize: 12,
-             color: saved >= target ? 'var(--water)' : 'var(--mist)' }}>
-          goal {target}
+             color: target > 0 && saved >= target ? 'var(--water)' : 'var(--mist)' }}>
+          {target > 0 ? `goal ${target}` : ''}
         </p>
       </div>
       {challenge.config.blurb && (
@@ -57,6 +60,7 @@ export default function RepsCounter({
               onClick={save} disabled={saving || reps === saved}>
         {reps === saved && saved > 0 ? `Saved ${saved}` : `Save ${reps}`}
       </button>
+      {footer}
     </div>
   );
 }
