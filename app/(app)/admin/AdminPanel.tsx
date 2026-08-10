@@ -699,22 +699,25 @@ export default function AdminPanel({
       </section>}
 
       {section === 'campaigns' && <section>
-        <div className="section-heading"><div><p className="eyebrow">Group challenge history</p><h2>Campaigns</h2></div></div>
+        <div className="section-heading"><div><p className="eyebrow">Group challenge</p><h2>Active campaign</h2></div></div>
         {activeCampaign && <CampaignControl campaign={activeCampaign} onCampaignChanged={replaceCampaign} />}
-        <article className="admin-card admin-create-card">
-          <h3>Create campaign</h3>
-          <p className="muted admin-help">A campaign defines the group challenge and its dates. Activate it when its activities are ready; the previous campaign will remain in history.</p>
-          <div className="admin-form-grid">
-            <div className="admin-wide"><label>Name</label><input placeholder="30-Day Athletic Challenge" value={newCampaign.name} maxLength={80} onChange={(event) => setNewCampaign((value) => ({ ...value, name: event.target.value }))} /></div>
-            <div><label>Start date</label><input type="date" value={newCampaign.startsOn} onChange={(event) => setNewCampaign((value) => ({ ...value, startsOn: event.target.value, endsOn: value.endsOn < event.target.value ? addDays(event.target.value, 29) : value.endsOn }))} /></div>
-            <div><label>End date</label><input type="date" min={newCampaign.startsOn} value={newCampaign.endsOn} onChange={(event) => setNewCampaign((value) => ({ ...value, endsOn: event.target.value }))} /></div>
-            <div className="admin-wide"><label>Description</label><textarea rows={3} value={newCampaign.description} maxLength={500} onChange={(event) => setNewCampaign((value) => ({ ...value, description: event.target.value }))} /></div>
-            <label className="admin-toggle admin-wide"><input type="checkbox" checked={newCampaign.active} onChange={(event) => setNewCampaign((value) => ({ ...value, active: event.target.checked }))} /><span>Activate immediately</span></label>
-          </div>
-          <div className="campaign-preview between"><span>Duration</span><strong className="num">{campaignDuration(newCampaign.startsOn, newCampaign.endsOn) || '—'} days</strong></div>
-          <button className="btn-water admin-save" disabled={busy || newCampaign.name.trim().length < 2 || campaignDuration(newCampaign.startsOn, newCampaign.endsOn) < 1} onClick={createCampaign}>Create campaign</button>
-        </article>
-        <div className="admin-list">{campaigns.map((campaign) => <CampaignEditor key={campaign.id} campaign={campaign} onSaved={replaceCampaign} />)}</div>
+        {activeCampaign && <details className="campaign-secondary-panel"><summary>Edit name and description</summary><CampaignEditor campaign={activeCampaign} onSaved={replaceCampaign} /></details>}
+        <details className="campaign-secondary-panel">
+          <summary>Create another campaign</summary>
+          <article className="admin-card admin-create-card">
+            <p className="muted admin-help">Create the next group challenge. The current campaign remains available in history.</p>
+            <div className="admin-form-grid">
+              <div className="admin-wide"><label>Name</label><input placeholder="30-Day Athletic Challenge" value={newCampaign.name} maxLength={80} onChange={(event) => setNewCampaign((value) => ({ ...value, name: event.target.value }))} /></div>
+              <div><label>Start date</label><input type="date" value={newCampaign.startsOn} onChange={(event) => setNewCampaign((value) => ({ ...value, startsOn: event.target.value, endsOn: value.endsOn < event.target.value ? addDays(event.target.value, 29) : value.endsOn }))} /></div>
+              <div><label>End date</label><input type="date" min={newCampaign.startsOn} value={newCampaign.endsOn} onChange={(event) => setNewCampaign((value) => ({ ...value, endsOn: event.target.value }))} /></div>
+              <div className="admin-wide"><label>Description</label><textarea rows={3} value={newCampaign.description} maxLength={500} onChange={(event) => setNewCampaign((value) => ({ ...value, description: event.target.value }))} /></div>
+              <label className="admin-toggle admin-wide"><input type="checkbox" checked={newCampaign.active} onChange={(event) => setNewCampaign((value) => ({ ...value, active: event.target.checked }))} /><span>Activate immediately</span></label>
+            </div>
+            <div className="campaign-preview between"><span>Duration</span><strong className="num">{campaignDuration(newCampaign.startsOn, newCampaign.endsOn) || '—'} days</strong></div>
+            <button className="btn-water admin-save" disabled={busy || newCampaign.name.trim().length < 2 || campaignDuration(newCampaign.startsOn, newCampaign.endsOn) < 1} onClick={createCampaign}>Create campaign</button>
+          </article>
+        </details>
+        {campaigns.some((campaign) => !campaign.active) && <><div className="campaign-history-heading"><p className="eyebrow">Previous campaigns</p></div><div className="admin-list">{campaigns.filter((campaign) => !campaign.active).map((campaign) => <CampaignEditor key={campaign.id} campaign={campaign} onSaved={replaceCampaign} />)}</div></>}
       </section>}
 
       {section === 'activities' && <section>

@@ -167,6 +167,8 @@ input, select, textarea {
   font-family: var(--body);
   font-size: 16px; /* 16px evita el zoom automático en iOS */
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   background: var(--deep);
   color: var(--chalk);
   border: 1px solid var(--line);
@@ -700,7 +702,7 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 .admin-entry-card { display: grid; gap: 14px; }
 
 /* In-app group administration ------------------------------- */
-.admin-page { max-width: 760px; }
+.admin-page { max-width: 760px; padding-bottom: 34px; }
 .admin-back {
   display: inline-flex;
   align-items: center;
@@ -799,22 +801,113 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 .campaign-preview strong { color: var(--water); font-size: 12px; }
 .campaign-select-card { margin-bottom: 13px; padding: 13px; border: 1px solid var(--line); border-radius: var(--r); background: var(--tile); }
 .campaign-admin-card .admin-toggle { margin-top: 2px; }
-.campaign-control-card { margin-bottom: 12px; border-color: var(--water); }
-.campaign-control-section { padding-top: 16px; border-top: 1px solid var(--line); }
-.campaign-control-section:first-of-type { padding-top: 0; border-top: 0; }
-.campaign-control-section + .campaign-control-section { margin-top: 18px; }
-.campaign-control-section h4 { color: var(--chalk); font-size: 13px; }
-.campaign-control-section > label { display: block; margin: 12px 0 6px; }
-.campaign-control-section > input { width: 100%; }
-.campaign-danger-zone {
-  padding: 15px;
+.campaign-control-panel { display: grid; gap: 12px; margin-bottom: 18px; }
+.campaign-control-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.campaign-control-heading h3 { margin-top: 4px; font-size: 22px; }
+.campaign-control-feedback { margin-top: 0; font-size: 12px; }
+.campaign-control-section {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--tile);
+}
+.campaign-schedule-card { border-color: color-mix(in srgb, var(--water) 70%, var(--line)); }
+.campaign-control-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.campaign-control-title h4 { margin-top: 4px; color: var(--chalk); font-size: 17px; }
+.campaign-control-title > strong { flex: 0 0 auto; color: var(--water); font-size: 12px; }
+.campaign-date-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+.campaign-date-grid > div,
+.campaign-date-grid input { min-width: 0; max-width: 100%; }
+.campaign-duration-block { margin-top: 14px; }
+.campaign-field-label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--mist);
+  font: 10px var(--data);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.campaign-duration-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.campaign-duration-options button {
+  min-width: 0;
+  padding: 9px 5px;
+  border: 1px solid var(--line);
+  background: var(--deep);
+  color: var(--mist);
+  font: 10px var(--data);
+}
+.campaign-duration-options button[data-active='true'] { border-color: var(--water); color: var(--water); }
+.campaign-primary-action,
+.campaign-secondary-action { width: 100%; margin-top: 14px; }
+.campaign-reset-card { background: color-mix(in srgb, var(--tile) 84%, var(--deep)); }
+.campaign-reset-review {
+  margin-top: 14px;
+  padding: 13px;
+  border: 1px solid color-mix(in srgb, var(--rope) 55%, var(--line));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--rope) 5%, var(--deep));
+}
+.campaign-reset-review > p { display: grid; gap: 3px; font-size: 12px; }
+.campaign-reset-review > p span { color: #ffb29b; font-size: 11px; }
+.campaign-reset-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 13px 0 0;
+  color: var(--chalk);
+  font-family: var(--body);
+  font-size: 12px;
+  letter-spacing: 0;
+  line-height: 1.4;
+  text-transform: none;
+}
+.campaign-reset-check input { flex: 0 0 19px; width: 19px; height: 19px; accent-color: var(--rope); }
+.campaign-reset-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 13px; }
+.campaign-reset-actions button { min-width: 0; padding-left: 8px; padding-right: 8px; }
+.campaign-advanced-reset {
+  border-top: 1px solid var(--line);
+  color: var(--mist);
+}
+.campaign-advanced-reset summary {
+  padding: 12px 2px;
+  cursor: pointer;
+  font: 10px var(--data);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.campaign-advanced-reset-body {
+  padding: 14px;
   border: 1px solid color-mix(in srgb, var(--rope) 55%, var(--line));
   border-radius: 11px;
   background: color-mix(in srgb, var(--rope) 6%, var(--deep));
 }
-.campaign-danger-zone p { margin-top: 7px; color: #ffb29b; font-size: 11px; line-height: 1.5; }
-.campaign-danger-zone .btn-rope { border-color: var(--rope); }
-.campaign-danger-all { border-color: var(--rope); }
+.campaign-advanced-reset-body p { margin-bottom: 13px; color: #ffb29b; font-size: 11px; line-height: 1.5; }
+.campaign-secondary-panel { margin-bottom: 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--tile); }
+.campaign-secondary-panel > summary {
+  padding: 14px 16px;
+  cursor: pointer;
+  color: var(--chalk);
+  font-size: 13px;
+  font-weight: 600;
+}
+.campaign-secondary-panel > .admin-card { border: 0; border-top: 1px solid var(--line); border-radius: 0 0 var(--r) var(--r); }
+.campaign-history-heading { margin: 22px 0 11px; }
 .code-fields { margin-top: 14px; }
 .activity-creator-heading { align-items: flex-start; margin-bottom: 4px; }
 .activity-ai-box {
@@ -988,4 +1081,9 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
   .feed-description { padding-left: 14px; padding-right: 14px; }
   .body-metrics-fields { grid-template-columns: 1fr; }
   .body-note { grid-column: auto; }
+}
+
+@media (max-width: 520px) {
+  .campaign-date-grid { grid-template-columns: 1fr; }
+  .campaign-control-heading .status-dot { max-width: 42%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
