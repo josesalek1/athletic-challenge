@@ -132,7 +132,7 @@ function normalizeGeneratedActivity(value: Record<string, unknown>, fallback: Ac
     name: String(value.name ?? fallback.name).trim().slice(0, 60) || fallback.name,
     kind,
     category,
-    target: String(Math.max(1, Number(value.target ?? fallback.target) || 1)),
+    target: String(Math.min(10000, Math.max(1, Math.round(Number(value.target ?? fallback.target) || 1)))),
     description: String(value.description ?? fallback.description).trim().slice(0, 220),
     checklistText: checklistItems.length
       ? checklistItems.map((item) => `${item} |`).join('\n')
