@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { PLAN, PROGRESSION, type Exercise } from '@/lib/plan';
 import { mmss } from '@/lib/format';
+import type { BodyMetric } from '@/lib/types';
+import BodyMetricsForm from './BodyMetricsForm';
 import {
   hasQueuedTrainingSession,
   isNetworkFailure,
@@ -41,6 +43,7 @@ export default function TrainingDay({
   done,
   userId,
   todaySwim,
+  bodyMetric,
 }: {
   slotKey: string;
   day: string;
@@ -49,6 +52,7 @@ export default function TrainingDay({
   done: boolean;
   userId: string;
   todaySwim: SwimRow | null;
+  bodyMetric: BodyMetric | null;
 }) {
   const supabase = createClient();
   const slot = PLAN.find((s) => s.key === slotKey)!;
@@ -273,6 +277,7 @@ export default function TrainingDay({
             {s.name.split(' · ')[0]}
           </a>
         ))}
+        <a href="#body" className="chip">Body</a>
       </div>
 
       {slot.note && (
@@ -390,6 +395,8 @@ export default function TrainingDay({
           <p className="muted" style={{ paddingBottom: 10 }}>{PROGRESSION}</p>
         </>
       )}
+
+      <BodyMetricsForm day={day} userId={userId} initialMetric={bodyMetric} />
     </main>
   );
 }

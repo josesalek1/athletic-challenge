@@ -62,3 +62,11 @@ export type Entry = {
   day: string;
   payload: Payload;
 };
+
+export type BodyMetric = {
+  user_id: string;
+  day: string;
+  weight_kg: number | null;
+  waist_cm: number | null;
+  note: string | null;
+};

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { today } from '@/lib/format';
 import { slotForWeekday, PLAN } from '@/lib/plan';
+import type { BodyMetric } from '@/lib/types';
 import TrainingDay from './TrainingDay';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,7 @@ export default async function Training({
   const slot = (wanted && PLAN.find((s) => s.key === wanted)) || slotForWeekday(weekday);
 
   // Sin filtro por usuario: la RLS ya devuelve solo lo tuyo.
-  const [{ data: todaySets }, { data: history }, { data: session }, { data: swim }] = await Promise.all([
+  const [{ data: todaySets }, { data: history }, { data: session }, { data: swim }, { data: bodyMetric }] = await Promise.all([
     supabase.from('training_sets').select('*').eq('day', day).eq('slot', slot.key),
     supabase.from('training_sets').select('*').lt('day', day)
       .eq('slot', slot.key).order('day', { ascending: false }).limit(200),
@@ -27,6 +28,7 @@ export default async function Training({
     slot.kind === 'swim'
       ? supabase.from('swim_sessions').select('distance_m, duration_s, stroke, rpe, notes').eq('day', day).maybeSingle()
       : Promise.resolve({ data: null }),
+    supabase.from('body_metrics').select('user_id, day, weight_kg, waist_cm, note').eq('day', day).maybeSingle(),
   ]);
 
   return (
@@ -38,6 +40,7 @@ export default async function Training({
       done={Boolean(session?.done)}
       userId={user!.id}
       todaySwim={swim ?? null}
+      bodyMetric={(bodyMetric ?? null) as BodyMetric | null}
     />
   );
 }

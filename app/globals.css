@@ -552,6 +552,8 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
   white-space: nowrap;
 }
 .training-insights { display: grid; gap: 12px; }
+.trend-layer-grid { display: grid; gap: 12px; }
+.trend-layer-card .auto-insight { margin-top: 14px; }
 .compact-insight .big-metric { display: block; margin-top: 8px; color: var(--water); font-size: 30px; }
 .group-trend-card { margin-bottom: 24px; }
 .group-trend-card .insight-title { position: relative; z-index: 1; }
@@ -604,10 +606,20 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 .member-card > .between > strong { color: var(--water); font-size: 17px; }
 .progress-note { padding: 18px 8px 10px; text-align: center; }
 
+.body-section { margin-top: 24px; }
+.body-heading { margin-top: 0; }
+.body-metrics-form { display: grid; gap: 14px; }
+.body-metrics-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.body-note { grid-column: 1 / -1; }
+.body-note label { margin-bottom: 0; }
+.body-note small { color: var(--mist); font-size: 9px; }
+.body-note textarea { margin-top: 6px; resize: vertical; }
+
 @media (min-width: 620px) {
   .challenge-insights, .training-insights, .pulse-list, .member-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .trend-layer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .group-trend-card { padding: 20px; }
   .exercise-progress-grid, .ranking-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -942,4 +954,6 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
   .feed-composer { padding: 14px; }
   .feed-post-header { padding-left: 14px; padding-right: 14px; }
   .feed-description { padding-left: 14px; padding-right: 14px; }
+  .body-metrics-fields { grid-template-columns: 1fr; }
+  .body-note { grid-column: auto; }
 }

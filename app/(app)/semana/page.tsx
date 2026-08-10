@@ -4,7 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { daysEndingAt, mmss, today } from '@/lib/format';
 import { validChecklistDone } from '@/lib/checklist';
 import { PLAN } from '@/lib/plan';
-import type { Campaign, Challenge, Entry } from '@/lib/types';
+import { classifyTrend, hasThreeConsecutiveDeclines, movingAverage, percentChange as precisePercentChange, trendDirection } from '@/lib/trends';
+import type { BodyMetric, Campaign, Challenge, Entry } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,7 +55,7 @@ function changePercent(current: number, previous: number, lowerIsBetter = false)
 }
 
 function signedPercent(value: number | null) {
-  if (value == null) return 'No previous data';
+  if (value == null) return 'Not enough data';
   return `${value > 0 ? '+' : ''}${value}%`;
 }
 
@@ -116,7 +117,12 @@ export default async function Progress({
   const view: View = params.view === 'group' ? 'group' : 'me';
   const actualToday = today();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  await supabase.auth.getUser();
+  const trendDays = daysEndingAt(actualToday, 30);
+  const trendPreviousAnchorDate = new Date(`${trendDays[0]}T12:00:00`);
+  trendPreviousAnchorDate.setDate(trendPreviousAnchorDate.getDate() - 1);
+  const trendPreviousDays = daysEndingAt(trendPreviousAnchorDate.toISOString().slice(0, 10), 30);
+  const trendStart = trendPreviousDays[0];
 
   const { data: campaignRows } = await supabase
     .from('campaigns')
@@ -142,6 +148,7 @@ export default async function Progress({
   const previousDays = daysEndingAt(previousAnchor, range)
     .filter((day) => !campaign || day >= campaign.starts_on);
   const allDays = campaignDays.length ? campaignDays : [anchorDay];
+  const historyStart = [allDays[0], trendStart].sort()[0];
   const currentDay = anchorDay;
   const axisEndLabel = currentDay === actualToday ? 'Today' : shortDate(currentDay);
 
@@ -149,26 +156,31 @@ export default async function Progress({
     { data: profiles },
     { data: checkins },
     { data: challenges },
+    { data: habits },
     { data: entries },
     { data: trainingSessions },
     { data: trainingSets },
     { data: swimSessions },
+    { data: bodyMetrics },
   ] = await Promise.all([
     supabase.from('profiles').select('id, display_name').eq('active', true).order('display_name'),
     supabase.from('group_checkins').select('user_id, challenge_id, day, goal_met')
       .gte('day', allDays[0]),
     campaign
-      ? supabase.from('challenges').select('*').eq('campaign_id', campaign.id).order('sort_order')
+      ? supabase.from('challenges').select('*').eq('campaign_id', campaign.id).eq('visibility', 'group').order('sort_order')
       : Promise.resolve({ data: [] }),
-    supabase.from('entries').select('user_id, challenge_id, day, payload')
-      .eq('user_id', user!.id),
+    supabase.from('challenges').select('*').eq('visibility', 'private').eq('active', true).order('sort_order'),
+    supabase.from('entries').select('user_id, challenge_id, day, payload'),
     supabase.from('training_sessions').select('day, slot, done, distance_m')
-      .gte('day', allDays[0]),
+      .gte('day', historyStart),
     supabase.from('training_sets').select('day, exercise_key, weight_kg, reps, seconds'),
     supabase.from('swim_sessions').select('day, distance_m, duration_s, stroke, rpe, notes'),
+    supabase.from('body_metrics').select('user_id, day, weight_kg, waist_cm, note').gte('day', trendStart),
   ]);
 
   const active = (challenges ?? []) as Challenge[];
+  const privateHabits = (habits ?? []) as Challenge[];
+  const privateBodyMetrics = (bodyMetrics ?? []) as BodyMetric[];
   const activityIds = new Set(active.map((challenge) => challenge.id));
   const privateEntries = (entries ?? []) as Entry[];
   const shared = ((checkins ?? []) as GroupCheckin[])
@@ -232,14 +244,14 @@ export default async function Progress({
     }
     const trendLabel = change == null
       ? 'Not enough data'
-      : change > 2 ? 'Improving' : change < -2 ? 'Declining' : 'Stable';
+      : change > 2 ? 'Improving' : change < -2 ? 'Declining' : 'Holding steady';
     const insight = !values.length
       ? `No ${challenge.name} result has been logged in this period yet.`
       : previousValues.length
       ? change === 0
         ? `Your ${challenge.name} average stayed steady versus the previous ${range} days.`
         : `Your ${challenge.name} average ${change! > 0 ? 'increased' : 'decreased'} by ${Math.abs(change!)}% versus the previous ${range} days.`
-      : `You logged ${values.length} ${values.length === 1 ? 'result' : 'results'} in this period. Keep going to unlock a comparison.`;
+      : `You logged ${values.length} ${values.length === 1 ? 'result' : 'results'} in this period. A prior-period comparison is not available.`;
 
     const practiceCounts = challenge.kind === 'checklist'
       ? (challenge.config.items ?? []).map((item) => ({
@@ -277,16 +289,89 @@ export default async function Progress({
     ? challengeProgress
     : challengeProgress.filter((item) => item.challenge.id === selectedChallenge);
 
+  const habitEntries = privateEntries.filter((entry) =>
+    privateHabits.some((habit) => habit.id === entry.challenge_id)
+  );
+  const habitTrendProgress = privateHabits.map((habit) => {
+    const currentHabitDays = trendDays.filter((day) => !habit.started_on || day >= habit.started_on);
+    const previousHabitDays = trendPreviousDays.filter((day) => !habit.started_on || day >= habit.started_on);
+    const rows = habitEntries.filter((entry) => entry.challenge_id === habit.id);
+    const byDay = new Map(rows.map((entry) => [entry.day, entry]));
+    const currentRows = rows.filter((entry) => trendDays.includes(entry.day));
+    const previousRows = rows.filter((entry) => trendPreviousDays.includes(entry.day));
+    const currentValues = currentHabitDays.map((day) => valueFor(byDay.get(day), habit));
+    const previousValues = previousHabitDays.map((day) => valueFor(byDay.get(day), habit));
+    const currentAverage = average(currentValues);
+    const previousAverage = average(previousValues);
+    const rawChange = precisePercentChange(currentAverage, previousAverage);
+    const dataDays = new Set([...currentRows, ...previousRows].map((entry) => entry.day)).size;
+    const enoughData = dataDays >= 7 && currentRows.length > 0 && previousRows.length > 0;
+    const label = habit.kind === 'done'
+      ? null
+      : classifyTrend(rawChange, 10, enoughData);
+    const completion = currentHabitDays.length
+      ? Math.round((currentValues.filter((value) => value > 0).length / currentHabitDays.length) * 100)
+      : 0;
+    let currentStreak = 0;
+    const streakDays = daysEndingAt(actualToday, Math.max(365, rows.length + 30));
+    for (let index = streakDays.length - 1; index >= 0; index--) {
+      const streakDay = streakDays[index];
+      if (valueFor(byDay.get(streakDay), habit) > 0) currentStreak++;
+      else if (streakDay !== actualToday) break;
+    }
+    const roundedChange = rawChange == null ? null : Math.round(rawChange);
+    const insight = label === null
+      ? `${habit.name} was completed on ${completion}% of the last 30 days.`
+      : label === 'Not enough data'
+        ? 'At least seven logged days across both periods are required for a trend.'
+        : `${habit.name} daily average ${roundedChange! >= 0 ? 'up' : 'down'} ${Math.abs(roundedChange!)}% over the last 30 days.`;
+
+    return {
+      habit,
+      currentAverage,
+      completion,
+      currentStreak,
+      change: roundedChange,
+      label,
+      insight,
+    };
+  });
+
+  const weightRows = privateBodyMetrics.filter((metric) => metric.weight_kg != null);
+  const smoothedWeight = movingAverage(weightRows, (metric) => metric.weight_kg!, 7);
+  const currentWeightRows = weightRows.filter((metric) => trendDays.includes(metric.day));
+  const previousWeightRows = weightRows.filter((metric) => trendPreviousDays.includes(metric.day));
+  const currentWeightAverages = smoothedWeight.filter((point) => trendDays.includes(point.day));
+  const previousWeightAverages = smoothedWeight.filter((point) => trendPreviousDays.includes(point.day));
+  const currentWeightAverage = average(currentWeightAverages.map((point) => point.value));
+  const previousWeightAverage = average(previousWeightAverages.map((point) => point.value));
+  const weightRawChange = precisePercentChange(currentWeightAverage, previousWeightAverage);
+  const weightTrendChange = precisePercentChange(currentWeightAverage, previousWeightAverage, true);
+  const weightEnoughData = currentWeightRows.length > 0
+    && previousWeightRows.length > 0
+    && new Set(weightRows.map((metric) => metric.day)).size >= 7
+    && currentWeightAverages.length > 0
+    && previousWeightAverages.length > 0;
+  const weightTrendLabel = classifyTrend(weightTrendChange, 1, weightEnoughData);
+  const roundedWeightChange = weightRawChange == null ? null : Math.round(weightRawChange * 10) / 10;
+  const weightInsight = weightTrendLabel === 'Not enough data'
+    ? 'At least seven weight measurements across both periods are required for a trend.'
+    : `7-day average weight ${roundedWeightChange! >= 0 ? 'up' : 'down'} ${Math.abs(roundedWeightChange!)}% over the last 30 days.`;
+
   const periodTraining = ((trainingSessions ?? []) as TrainingSession[])
     .filter((session) => days.includes(session.day) && session.done);
   const periodSets = ((trainingSets ?? []) as TrainingSet[])
     .filter((set) => days.includes(set.day));
-  const previousSets = ((trainingSets ?? []) as TrainingSet[])
-    .filter((set) => previousDays.includes(set.day));
+  const trendCurrentSets = ((trainingSets ?? []) as TrainingSet[])
+    .filter((set) => trendDays.includes(set.day));
+  const trendPreviousSets = ((trainingSets ?? []) as TrainingSet[])
+    .filter((set) => trendPreviousDays.includes(set.day));
   const periodSwims = ((swimSessions ?? []) as SwimSession[])
     .filter((session) => days.includes(session.day));
-  const previousSwims = ((swimSessions ?? []) as SwimSession[])
-    .filter((session) => previousDays.includes(session.day));
+  const trendCurrentSwims = ((swimSessions ?? []) as SwimSession[])
+    .filter((session) => trendDays.includes(session.day) && pacePer100(session.distance_m ?? 0, session.duration_s ?? 0) > 0);
+  const trendPreviousSwims = ((swimSessions ?? []) as SwimSession[])
+    .filter((session) => trendPreviousDays.includes(session.day) && pacePer100(session.distance_m ?? 0, session.duration_s ?? 0) > 0);
   const strengthSlots = new Set(PLAN.filter((slot) => slot.kind === 'strength').map((slot) => slot.key));
   const swimSlots = new Map(PLAN.filter((slot) => slot.kind === 'swim').map((slot) => [
     slot.key,
@@ -298,7 +383,6 @@ export default async function Progress({
   const swimDistance = plannedSwimDone.reduce((sum, session) =>
     sum + (detailedSwimDays.has(session.day) ? 0 : session.distance_m ?? swimSlots.get(session.slot) ?? 0), 0
   ) + periodSwims.reduce((sum, session) => sum + (session.distance_m ?? 0), 0);
-  const swimDuration = periodSwims.reduce((sum, session) => sum + (session.duration_s ?? 0), 0);
   const swimSessionCount = new Set([
     ...plannedSwimDone.map((session) => session.day),
     ...periodSwims.map((session) => session.day),
@@ -309,19 +393,37 @@ export default async function Progress({
   const completedTrainingSessions = periodTraining.length;
 
   const exerciseLookup = new Map(PLAN.flatMap((slot) => slot.exercises ?? []).map((exercise) => [exercise.key, exercise]));
-  const exerciseProgress = [...new Set(periodSets.map((set) => set.exercise_key))].map((key) => {
+  const exerciseKeys = new Set([
+    ...periodSets.map((set) => set.exercise_key),
+    ...trendCurrentSets.map((set) => set.exercise_key),
+    ...trendPreviousSets.map((set) => set.exercise_key),
+  ]);
+  const exerciseProgress = [...exerciseKeys].map((key) => {
     const exercise = exerciseLookup.get(key);
     const current = periodSets.filter((set) => set.exercise_key === key);
-    const previous = previousSets.filter((set) => set.exercise_key === key);
     const historical = ((trainingSets ?? []) as TrainingSet[]).filter((set) => set.exercise_key === key);
     const currentVolume = current.reduce((sum, set) => sum + ((set.weight_kg ?? 0) * (set.reps ?? 0)), 0);
-    const previousVolume = previous.reduce((sum, set) => sum + ((set.weight_kg ?? 0) * (set.reps ?? 0)), 0);
-    const comparisonCurrent = exercise?.timed
-      ? average(current.map((set) => set.seconds ?? 0).filter(Boolean))
-      : currentVolume || average(current.map((set) => set.reps ?? 0).filter(Boolean));
-    const comparisonPrevious = exercise?.timed
-      ? average(previous.map((set) => set.seconds ?? 0).filter(Boolean))
-      : previousVolume || average(previous.map((set) => set.reps ?? 0).filter(Boolean));
+    const sessionVolumes = (sets: TrainingSet[]) => {
+      const daysForExercise = [...new Set(sets.filter((set) => set.exercise_key === key).map((set) => set.day))].sort();
+      return daysForExercise.map((day) => ({
+        day,
+        volume: sets
+          .filter((set) => set.exercise_key === key && set.day === day)
+          .reduce((sum, set) => sum + ((set.weight_kg ?? 0) * (set.reps ?? 0)), 0),
+      })).filter((session) => session.volume > 0);
+    };
+    const currentSessionVolumes = sessionVolumes(trendCurrentSets);
+    const previousSessionVolumes = sessionVolumes(trendPreviousSets);
+    const allTrendVolumes = [...previousSessionVolumes, ...currentSessionVolumes].sort((a, b) => a.day.localeCompare(b.day));
+    const currentAverageVolume = average(currentSessionVolumes.map((session) => session.volume));
+    const previousAverageVolume = average(previousSessionVolumes.map((session) => session.volume));
+    const preciseVolumeChange = precisePercentChange(currentAverageVolume, previousAverageVolume);
+    const strengthEnoughData = allTrendVolumes.length >= 7
+      && currentSessionVolumes.length > 0
+      && previousSessionVolumes.length > 0;
+    const decliningThreeSessions = hasThreeConsecutiveDeclines(allTrendVolumes.map((session) => session.volume));
+    const trendLabel = classifyTrend(preciseVolumeChange, 10, strengthEnoughData, decliningThreeSessions);
+    const volumeChange = preciseVolumeChange == null ? null : Math.round(preciseVolumeChange);
     const bestWeight = Math.max(0, ...historical.map((set) => set.weight_kg ?? 0));
     const bestReps = Math.max(0, ...historical.map((set) => set.reps ?? 0));
     const bestSeconds = Math.max(0, ...historical.map((set) => set.seconds ?? 0));
@@ -333,7 +435,11 @@ export default async function Progress({
       name: exercise?.name ?? key,
       timed: Boolean(exercise?.timed),
       currentVolume,
-      change: changePercent(comparisonCurrent, comparisonPrevious),
+      change: volumeChange,
+      trendLabel,
+      trendInsight: trendLabel === 'Not enough data'
+        ? 'At least seven loaded sessions across both periods are required for a trend.'
+        : `${exercise?.name ?? key} volume ${volumeChange! >= 0 ? 'up' : 'down'} ${Math.abs(volumeChange!)}% over the last 30 days.`,
       bestWeight,
       bestReps,
       bestSeconds,
@@ -346,16 +452,31 @@ export default async function Progress({
 
   const swimDistanceCurrent = periodSwims.reduce((sum, session) => sum + (session.distance_m ?? 0), 0);
   const swimTimeCurrent = periodSwims.reduce((sum, session) => sum + (session.duration_s ?? 0), 0);
-  const swimDistancePrevious = previousSwims.reduce((sum, session) => sum + (session.distance_m ?? 0), 0);
-  const swimTimePrevious = previousSwims.reduce((sum, session) => sum + (session.duration_s ?? 0), 0);
   const swimPace = pacePer100(swimDistanceCurrent, swimTimeCurrent);
-  const previousSwimPace = pacePer100(swimDistancePrevious, swimTimePrevious);
   const validSwims = ((swimSessions ?? []) as SwimSession[]).filter((session) => pacePer100(session.distance_m ?? 0, session.duration_s ?? 0));
   const bestSwimPace = validSwims.length
     ? Math.min(...validSwims.map((session) => pacePer100(session.distance_m ?? 0, session.duration_s ?? 0)))
     : 0;
   const averageRpe = average(periodSwims.map((session) => session.rpe ?? 0).filter(Boolean));
-  const swimPaceChange = changePercent(swimPace, previousSwimPace, true);
+  const trendSwimPace = pacePer100(
+    trendCurrentSwims.reduce((sum, session) => sum + (session.distance_m ?? 0), 0),
+    trendCurrentSwims.reduce((sum, session) => sum + (session.duration_s ?? 0), 0)
+  );
+  const trendPreviousSwimPace = pacePer100(
+    trendPreviousSwims.reduce((sum, session) => sum + (session.distance_m ?? 0), 0),
+    trendPreviousSwims.reduce((sum, session) => sum + (session.duration_s ?? 0), 0)
+  );
+  const swimPacePreciseChange = precisePercentChange(trendSwimPace, trendPreviousSwimPace, true);
+  const swimPaceRawChange = precisePercentChange(trendSwimPace, trendPreviousSwimPace);
+  const swimEnoughData = new Set([...trendCurrentSwims, ...trendPreviousSwims].map((session) => session.day)).size >= 7
+    && trendCurrentSwims.length > 0
+    && trendPreviousSwims.length > 0;
+  const swimTrendLabel = classifyTrend(swimPacePreciseChange, 2, swimEnoughData);
+  const swimPaceChange = swimPacePreciseChange == null ? null : Math.round(swimPacePreciseChange);
+  const roundedSwimRawChange = swimPaceRawChange == null ? null : Math.round(swimPaceRawChange);
+  const swimTrendInsight = swimTrendLabel === 'Not enough data'
+    ? 'At least seven timed swim sessions across both periods are required for a trend.'
+    : `Average swim pace ${roundedSwimRawChange! >= 0 ? 'up' : 'down'} ${Math.abs(roundedSwimRawChange!)}% over the last 30 days.`;
 
   function groupDayProgress(userId: string, day: string) {
     const available = availableChallenges(day);
@@ -528,6 +649,47 @@ export default async function Progress({
           </section>
 
           <div className="section-heading">
+            <div><p className="eyebrow">30-day trend layer</p><h2>Body and private habits</h2></div>
+            <span className="privacy-pill">Only you</span>
+          </div>
+
+          <div className="trend-layer-grid">
+            <article className="insight-card trend-layer-card">
+              <div className="between insight-title">
+                <div><p className="eyebrow">Body</p><h3>Weight</h3></div>
+                <span className="trend-mark" data-direction={trendDirection(weightTrendLabel)}>{weightTrendLabel}</span>
+              </div>
+              <div className="metric-row two">
+                <div><span>7-day average</span><strong className="num">{currentWeightAverage ? `${currentWeightAverage.toFixed(1)} kg` : '—'}</strong></div>
+                <div><span>vs prior 30 days</span><strong className="num">{roundedWeightChange == null ? 'Not enough data' : `${roundedWeightChange > 0 ? '+' : ''}${roundedWeightChange}%`}</strong></div>
+              </div>
+              <p className="auto-insight">{weightInsight}</p>
+              <p className="metric-explainer">Trend uses a 7-day moving average. Daily weight values are not shown.</p>
+            </article>
+
+            {habitTrendProgress.map((item) => (
+              <article className="insight-card trend-layer-card" key={item.habit.id}>
+                <div className="between insight-title">
+                  <div><p className="eyebrow">Private habit</p><h3>{item.habit.name}</h3></div>
+                  {item.label && <span className="trend-mark" data-direction={trendDirection(item.label)}>{item.label}</span>}
+                </div>
+                {item.habit.kind === 'done' ? (
+                  <div className="metric-row two">
+                    <div><span>30-day completion</span><strong className="num">{item.completion}%</strong></div>
+                    <div><span>Current streak</span><strong className="num">{plural(item.currentStreak, 'day')}</strong></div>
+                  </div>
+                ) : (
+                  <div className="metric-row two">
+                    <div><span>Daily average</span><strong className="num">{formatAverageValue(item.currentAverage, item.habit)}</strong></div>
+                    <div><span>vs prior 30 days</span><strong className="num">{item.change == null ? 'Not enough data' : signedPercent(item.change)}</strong></div>
+                  </div>
+                )}
+                <p className="auto-insight">{item.insight}</p>
+              </article>
+            ))}
+          </div>
+
+          <div className="section-heading">
             <div><p className="eyebrow">Campaign activities</p><h2>Exact results</h2></div>
             <span className="privacy-pill">Only you</span>
           </div>
@@ -608,16 +770,17 @@ export default async function Progress({
               </div>
             </article>
             <article className="insight-card compact-insight">
-              <p className="eyebrow">Swimming</p>
+              <div className="between"><p className="eyebrow">Swimming</p><span className="trend-mark" data-direction={trendDirection(swimTrendLabel)}>{swimTrendLabel}</span></div>
               <strong className="big-metric num">{(swimDistance / 1000).toFixed(swimDistance ? 1 : 0)} km</strong>
               <p className="muted">distance completed</p>
               <div className="metric-row">
                 <div><span>Sessions</span><strong className="num">{swimSessionCount}</strong></div>
                 <div><span>Avg pace</span><strong className="num">{swimPace ? `${mmss(swimPace)}/100m` : '—'}</strong></div>
-                <div><span>Pace change</span><strong className="num">{signedPercent(swimPaceChange)}</strong></div>
+                <div><span>vs prior 30 days</span><strong className="num">{signedPercent(swimPaceChange)}</strong></div>
               </div>
               <div className="record-row"><span>Best pace</span><strong className="num">{bestSwimPace ? `${mmss(bestSwimPace)}/100m` : '—'}</strong></div>
               <div className="record-row"><span>Average effort</span><strong className="num">{averageRpe ? `${averageRpe.toFixed(1)}/10` : '—'}</strong></div>
+              <p className="auto-insight">{swimTrendInsight}</p>
               <p className="metric-explainer">Pace is calculated only from the distance and duration you enter manually. No watch is connected.</p>
             </article>
           </div>
@@ -628,12 +791,13 @@ export default async function Progress({
               <div className="exercise-progress-grid">
                 {exerciseProgress.map((exercise) => (
                   <article className="exercise-progress-card" key={exercise.key}>
-                    <div className="between"><h3>{exercise.name}</h3><span className="num">{exercise.sessions}×</span></div>
+                    <div className="between"><h3>{exercise.name}</h3><span className="trend-mark" data-direction={trendDirection(exercise.trendLabel)}>{exercise.trendLabel}</span></div>
                     <div className="metric-row">
                       <div><span>Latest</span><strong className="num">{exercise.timed ? mmss(exercise.latestSeconds) : exercise.latestWeight ? `${exercise.latestWeight} kg` : `${exercise.latestReps} reps`}</strong></div>
                       <div><span>Personal best</span><strong className="num">{exercise.timed ? mmss(exercise.bestSeconds) : exercise.bestWeight ? `${exercise.bestWeight} kg` : `${exercise.bestReps} reps`}</strong></div>
-                      <div><span>vs prior {range} days</span><strong className="num">{signedPercent(exercise.change)}</strong></div>
+                      <div><span>vs prior 30 days</span><strong className="num">{signedPercent(exercise.change)}</strong></div>
                     </div>
+                    <p className="auto-insight">{exercise.trendInsight}</p>
                   </article>
                 ))}
               </div>
@@ -641,7 +805,7 @@ export default async function Progress({
           )}
 
           <p className="muted progress-note">
-            Your repetitions, times, selected Yogic practices, weights and swim details are private.
+            Your habits, body measurements, repetitions, times, selected Yogic practices, weights and swim details are private.
           </p>
         </>
       ) : (
