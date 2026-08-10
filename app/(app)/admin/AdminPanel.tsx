@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import type { Campaign, Challenge } from '@/lib/types';
 import type { MemberAdmin, VideoAdmin } from './page';
+import CampaignControl from './CampaignControl';
 
 type Section = 'members' | 'campaigns' | 'activities' | 'videos';
 type Feedback = { tone: 'success' | 'error'; text: string } | null;
@@ -282,7 +283,13 @@ function CampaignEditor({ campaign, onSaved }: { campaign: Campaign; onSaved: (c
   const [feedback, setFeedback] = useState<Feedback>(null);
   const duration = campaignDuration(startsOn, endsOn);
 
-  useEffect(() => setActive(campaign.active), [campaign.active]);
+  useEffect(() => {
+    setName(campaign.name);
+    setDescription(campaign.description);
+    setStartsOn(campaign.starts_on);
+    setEndsOn(campaign.ends_on);
+    setActive(campaign.active);
+  }, [campaign]);
 
   async function save() {
     setBusy(true);
@@ -317,8 +324,9 @@ function CampaignEditor({ campaign, onSaved }: { campaign: Campaign; onSaved: (c
       </div>
       <div className="admin-form-grid">
         <div className="admin-wide"><label>Name</label><input value={name} maxLength={80} onChange={(event) => setName(event.target.value)} /></div>
-        <div><label>Start date</label><input type="date" value={startsOn} onChange={(event) => setStartsOn(event.target.value)} /></div>
-        <div><label>End date</label><input type="date" min={startsOn} value={endsOn} onChange={(event) => setEndsOn(event.target.value)} /></div>
+        <div><label>Start date</label><input type="date" value={startsOn} disabled /></div>
+        <div><label>End date</label><input type="date" value={endsOn} disabled /></div>
+        <p className="muted admin-help admin-wide">Official dates are managed in Campaign control.</p>
         <div className="admin-wide"><label>Description</label><textarea rows={3} value={description} maxLength={500} onChange={(event) => setDescription(event.target.value)} /></div>
         <label className="admin-toggle admin-wide"><input type="checkbox" checked={active} disabled={campaign.active} onChange={(event) => setActive(event.target.checked)} /><span>{campaign.active ? 'This is the active campaign' : 'Make this the active campaign'}</span></label>
       </div>
@@ -480,8 +488,8 @@ export default function AdminPanel({
   const [campaigns, setCampaigns] = useState(initialCampaigns);
   const [challenges, setChallenges] = useState(initialChallenges);
   const [videos, setVideos] = useState(initialVideos);
-  const activeCampaign = initialCampaigns.find((campaign) => campaign.active) ?? initialCampaigns[0];
-  const [selectedCampaignId, setSelectedCampaignId] = useState(activeCampaign?.id ?? '');
+  const initialActiveCampaign = initialCampaigns.find((campaign) => campaign.active) ?? initialCampaigns[0];
+  const [selectedCampaignId, setSelectedCampaignId] = useState(initialActiveCampaign?.id ?? '');
   const initialDate = new Date().toISOString().slice(0, 10);
   const [newCampaign, setNewCampaign] = useState({ name: '', description: '', startsOn: initialDate, endsOn: addDays(initialDate, 29), active: false });
   const [activityDraft, setActivityDraft] = useState<ActivityDraft>(EMPTY_ACTIVITY);
@@ -493,6 +501,7 @@ export default function AdminPanel({
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [invite, setInvite] = useState({ name: '', email: '' });
+  const activeCampaign = campaigns.find((campaign) => campaign.active) ?? campaigns[0];
   const selectedCampaign = campaigns.find((campaign) => campaign.id === selectedCampaignId);
   const previewActivityId = activityPreview && selectedCampaign
     ? activityIdFor(activityPreview.name, selectedCampaign.id, challenges)
@@ -507,6 +516,11 @@ export default function AdminPanel({
   }
   function replaceChallenge(next: Challenge) { setChallenges((items) => items.map((item) => item.id === next.id ? next : item).sort((a, b) => a.sort_order - b.sort_order)); }
   function replaceVideo(next: VideoAdmin) { setVideos((items) => items.map((item) => item.id === next.id ? next : item).sort((a, b) => a.sort_order - b.sort_order)); }
+
+  useEffect(() => setMembers(initialMembers), [initialMembers]);
+  useEffect(() => setCampaigns(initialCampaigns), [initialCampaigns]);
+  useEffect(() => setChallenges(initialChallenges), [initialChallenges]);
+  useEffect(() => setVideos(initialVideos), [initialVideos]);
 
   function updateActivityDraft(patch: Partial<ActivityDraft>) {
     setActivityDraft((value) => ({ ...value, ...patch }));
@@ -686,6 +700,7 @@ export default function AdminPanel({
 
       {section === 'campaigns' && <section>
         <div className="section-heading"><div><p className="eyebrow">Group challenge history</p><h2>Campaigns</h2></div></div>
+        {activeCampaign && <CampaignControl campaign={activeCampaign} onCampaignChanged={replaceCampaign} />}
         <article className="admin-card admin-create-card">
           <h3>Create campaign</h3>
           <p className="muted admin-help">A campaign defines the group challenge and its dates. Activate it when its activities are ready; the previous campaign will remain in history.</p>

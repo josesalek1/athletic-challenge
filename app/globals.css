@@ -81,6 +81,22 @@ body {
 .today-section-label { margin-bottom: 12px; color: var(--water); }
 .today-section-heading { align-items: center; margin-bottom: 12px; }
 .today-section-heading .today-section-label { margin-bottom: 0; }
+.campaign-readonly {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.campaign-readonly:disabled { opacity: 0.66; }
+.campaign-readonly-notice {
+  margin-bottom: 12px;
+  padding: 11px 12px;
+  border: 1px solid #e1bb62;
+  border-radius: 10px;
+  color: #e8d39d;
+  font-size: 11px;
+  line-height: 1.45;
+}
 .new-habit-link { padding: 9px 12px; font-size: 12px; }
 .habit-card-actions {
   display: grid;
@@ -783,6 +799,22 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 .campaign-preview strong { color: var(--water); font-size: 12px; }
 .campaign-select-card { margin-bottom: 13px; padding: 13px; border: 1px solid var(--line); border-radius: var(--r); background: var(--tile); }
 .campaign-admin-card .admin-toggle { margin-top: 2px; }
+.campaign-control-card { margin-bottom: 12px; border-color: var(--water); }
+.campaign-control-section { padding-top: 16px; border-top: 1px solid var(--line); }
+.campaign-control-section:first-of-type { padding-top: 0; border-top: 0; }
+.campaign-control-section + .campaign-control-section { margin-top: 18px; }
+.campaign-control-section h4 { color: var(--chalk); font-size: 13px; }
+.campaign-control-section > label { display: block; margin: 12px 0 6px; }
+.campaign-control-section > input { width: 100%; }
+.campaign-danger-zone {
+  padding: 15px;
+  border: 1px solid color-mix(in srgb, var(--rope) 55%, var(--line));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--rope) 6%, var(--deep));
+}
+.campaign-danger-zone p { margin-top: 7px; color: #ffb29b; font-size: 11px; line-height: 1.5; }
+.campaign-danger-zone .btn-rope { border-color: var(--rope); }
+.campaign-danger-all { border-color: var(--rope); }
 .code-fields { margin-top: 14px; }
 .activity-creator-heading { align-items: flex-start; margin-bottom: 4px; }
 .activity-ai-box {

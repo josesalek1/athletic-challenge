@@ -65,8 +65,21 @@ export default function TodayBoard({
   const campaignState = !campaign
     ? 'missing'
     : day < campaign.starts_on ? 'upcoming' : day > campaign.ends_on ? 'finished' : 'live';
+  const daysUntilStart = campaign && campaignState === 'upcoming'
+    ? Math.max(1, Math.ceil(
+        (new Date(`${campaign.starts_on}T12:00:00`).getTime() - new Date(`${day}T12:00:00`).getTime()) / 86400000
+      ))
+    : 0;
+  const campaignDayLabel = !campaign
+    ? 'No active campaign'
+    : campaignState === 'upcoming'
+      ? daysUntilStart === 1 ? 'Starts tomorrow' : `Starts in ${daysUntilStart} days`
+      : campaignState === 'finished'
+        ? 'Campaign complete'
+        : `Day ${dayNumber} of ${campaign.duration_days}`;
 
   async function save(challengeId: string, payload: Payload) {
+    if (!campaignLive && groupChallenges.some((challenge) => challenge.id === challengeId)) return;
     setLocal((l) => ({ ...l, [challengeId]: payload }));
 
     const mutation = {
@@ -169,7 +182,7 @@ export default function TodayBoard({
         })}
       </p>
       <h1 className="display today-title">
-        {campaign?.name ?? 'Athletic Challenge'} <span>· Day {dayNumber} of {campaign?.duration_days ?? '—'}</span>
+        {campaign?.name ?? 'Athletic Challenge'} <span>· {campaignDayLabel}</span>
       </h1>
 
       {campaign && (
@@ -186,12 +199,6 @@ export default function TodayBoard({
         <p className="eyebrow today-section-label" id="group-challenge-heading">Group challenge</p>
         {!campaign ? (
           <p className="empty">There is no active campaign. Ask an administrator to activate one.</p>
-        ) : !campaignLive ? (
-          <p className="empty">
-            {campaignState === 'upcoming'
-              ? `This campaign begins on ${campaign.starts_on}.`
-              : `This campaign ended on ${campaign.ends_on}. Your history remains available in Progress.`}
-          </p>
         ) : groupChallenges.length === 0 ? (
           <p className="empty">
             This campaign has no active activities.
@@ -200,6 +207,13 @@ export default function TodayBoard({
           </p>
         ) : (
           <>
+            {!campaignLive && (
+              <p className="campaign-readonly-notice">
+                {campaignState === 'upcoming'
+                  ? `${campaignDayLabel}. Activities are visible and open for logging on ${campaign.starts_on}.`
+                  : `Campaign complete. Activities are read-only; history remains available in Progress.`}
+              </p>
+            )}
             <div className="chips" role="tablist" aria-label="Group challenge activities">
               {groupChallenges.map((challenge) => (
                 <button key={challenge.id} className="chip" role="tab"
@@ -212,9 +226,13 @@ export default function TodayBoard({
               ))}
             </div>
 
-            {currentGroup && render(currentGroup)}
+            {currentGroup && (
+              <fieldset className="campaign-readonly" disabled={!campaignLive} aria-label={campaignLive ? undefined : 'Campaign activity in read-only mode'}>
+                {render(currentGroup)}
+              </fieldset>
+            )}
 
-            <div className="card">
+            {campaignLive && <div className="card">
               <div className="between" style={{ marginBottom: 10 }}>
                 <p className="eyebrow">Group report</p>
                 <p className="num" style={{ fontSize: 12, color: 'var(--mist)' }}>
@@ -231,7 +249,7 @@ export default function TodayBoard({
               <p className="muted" style={{ marginTop: 10 }}>
                 Pick the group and hit send. The text is already written.
               </p>
-            </div>
+            </div>}
           </>
         )}
       </section>
