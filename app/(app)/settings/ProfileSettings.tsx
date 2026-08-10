@@ -172,7 +172,7 @@ export default function ProfileSettings({
             <div>
               <p style={{ fontWeight: 600 }}>Manage Athletic Challenge</p>
               <p className="muted" style={{ marginTop: 4 }}>
-                Members, challenges, videos and the registration code.
+                Members, campaigns, activities and videos.
               </p>
             </div>
             <Link className="btn btn-water" href="/admin">Open admin panel</Link>

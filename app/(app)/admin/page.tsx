@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import type { Challenge } from '@/lib/types';
+import type { Campaign, Challenge } from '@/lib/types';
 import AdminPanel from './AdminPanel';
 
 export const dynamic = 'force-dynamic';
@@ -35,8 +35,9 @@ export default async function AdminPage() {
 
   if (!profile?.active || profile.role !== 'admin') redirect('/settings');
 
-  const [membersResult, challengesResult, videosResult] = await Promise.all([
+  const [membersResult, campaignsResult, challengesResult, videosResult] = await Promise.all([
     supabase.rpc('admin_list_members'),
+    supabase.from('campaigns').select('*').order('starts_on', { ascending: false }),
     supabase.from('challenges').select('*').order('sort_order'),
     supabase.from('videos').select('id, challenge_id, title, url, sort_order').order('sort_order'),
   ]);
@@ -45,6 +46,7 @@ export default async function AdminPage() {
     <AdminPanel
       currentUserId={user!.id}
       initialMembers={(membersResult.data ?? []) as MemberAdmin[]}
+      initialCampaigns={(campaignsResult.data ?? []) as Campaign[]}
       initialChallenges={(challengesResult.data ?? []) as Challenge[]}
       initialVideos={(videosResult.data ?? []) as VideoAdmin[]}
     />

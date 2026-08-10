@@ -23,6 +23,17 @@ export function lastNDays(n: number): string[] {
   return out;
 }
 
+export function daysEndingAt(iso: string, n: number): string[] {
+  const out: string[] = [];
+  const base = new Date(`${iso}T12:00:00`);
+  for (let i = n - 1; i >= 0; i--) {
+    const date = new Date(base);
+    date.setDate(base.getDate() - i);
+    out.push(date.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
 export const DOW = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
 export function dowOf(iso: string) {
   return DOW[new Date(iso + 'T12:00:00').getDay()];

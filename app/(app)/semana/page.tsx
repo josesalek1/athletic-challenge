@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/server';
-import { lastNDays, mmss, today } from '@/lib/format';
+import { daysEndingAt, mmss, today } from '@/lib/format';
 import { validChecklistDone } from '@/lib/checklist';
 import { PLAN } from '@/lib/plan';
-import type { Challenge, Entry } from '@/lib/types';
+import type { Campaign, Challenge, Entry } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -108,18 +108,42 @@ function plural(value: number, singular: string, pluralForm = `${singular}s`) {
 export default async function Progress({
   searchParams,
 }: {
-  searchParams: Promise<{ days?: string; view?: string; challenge?: string }>;
+  searchParams: Promise<{ days?: string; view?: string; challenge?: string; campaign?: string }>;
 }) {
   const params = await searchParams;
   const requested = Number(params.days);
   const range: Range = RANGES.includes(requested as Range) ? requested as Range : 7;
   const view: View = params.view === 'group' ? 'group' : 'me';
-  const allDays = lastNDays(180);
-  const days = allDays.slice(-range);
-  const previousDays = allDays.slice(-(range * 2), -range);
-  const currentDay = today();
+  const actualToday = today();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: campaignRows } = await supabase
+    .from('campaigns')
+    .select('*')
+    .order('starts_on', { ascending: false });
+  const campaigns = (campaignRows ?? []) as Campaign[];
+  const campaign = campaigns.find((item) => item.id === params.campaign)
+    ?? campaigns.find((item) => item.active)
+    ?? campaigns[0];
+  const anchorDay = campaign
+    ? actualToday < campaign.starts_on
+      ? campaign.starts_on
+      : actualToday > campaign.ends_on ? campaign.ends_on : actualToday
+    : actualToday;
+  const campaignDays = campaign
+    ? daysEndingAt(campaign.ends_on, campaign.duration_days).filter((day) => day <= anchorDay)
+    : daysEndingAt(anchorDay, 180);
+  const days = daysEndingAt(anchorDay, range)
+    .filter((day) => !campaign || (day >= campaign.starts_on && day <= campaign.ends_on));
+  const previousAnchorDate = new Date(`${days[0] ?? anchorDay}T12:00:00`);
+  previousAnchorDate.setDate(previousAnchorDate.getDate() - 1);
+  const previousAnchor = previousAnchorDate.toISOString().slice(0, 10);
+  const previousDays = daysEndingAt(previousAnchor, range)
+    .filter((day) => !campaign || day >= campaign.starts_on);
+  const allDays = campaignDays.length ? campaignDays : [anchorDay];
+  const currentDay = anchorDay;
+  const axisEndLabel = currentDay === actualToday ? 'Today' : shortDate(currentDay);
 
   const [
     { data: profiles },
@@ -133,7 +157,9 @@ export default async function Progress({
     supabase.from('profiles').select('id, display_name').eq('active', true).order('display_name'),
     supabase.from('group_checkins').select('user_id, challenge_id, day, goal_met')
       .gte('day', allDays[0]),
-    supabase.from('challenges').select('*').eq('active', true).order('sort_order'),
+    campaign
+      ? supabase.from('challenges').select('*').eq('campaign_id', campaign.id).order('sort_order')
+      : Promise.resolve({ data: [] }),
     supabase.from('entries').select('user_id, challenge_id, day, payload')
       .eq('user_id', user!.id),
     supabase.from('training_sessions').select('day, slot, done, distance_m')
@@ -143,8 +169,10 @@ export default async function Progress({
   ]);
 
   const active = (challenges ?? []) as Challenge[];
+  const activityIds = new Set(active.map((challenge) => challenge.id));
   const privateEntries = (entries ?? []) as Entry[];
-  const shared = (checkins ?? []) as GroupCheckin[];
+  const shared = ((checkins ?? []) as GroupCheckin[])
+    .filter((checkin) => activityIds.has(checkin.challenge_id));
   const periodEntries = privateEntries.filter((entry) => days.includes(entry.day));
   const previousEntries = privateEntries.filter((entry) => previousDays.includes(entry.day));
   const periodCheckins = shared.filter((checkin) => days.includes(checkin.day));
@@ -166,6 +194,7 @@ export default async function Progress({
   ]));
 
   function availableChallenges(day: string) {
+    if (campaign && (day < campaign.starts_on || day > campaign.ends_on)) return [];
     return active.filter((challenge) => !challenge.started_on || challenge.started_on <= day);
   }
 
@@ -199,7 +228,7 @@ export default async function Progress({
       const streakDay = allDays[index];
       const streakValue = valueFor(byAllPrivateKey.get(`${streakDay}|${challenge.id}`), challenge);
       if (streakValue >= target) goalStreak++;
-      else if (streakDay !== currentDay) break;
+      else if (streakDay !== actualToday) break;
     }
     const trendLabel = change == null
       ? 'Not enough data'
@@ -349,7 +378,7 @@ export default async function Progress({
       const day = allDays[index];
       const hasCheckin = shared.some((checkin) => checkin.user_id === userId && checkin.day === day);
       if (hasCheckin) count++;
-      else if (day !== currentDay) break;
+      else if (day !== actualToday) break;
     }
     return count;
   }
@@ -421,12 +450,14 @@ export default async function Progress({
     const day = allDays[index];
     const activeOnDay = new Set(shared.filter((checkin) => checkin.day === day).map((checkin) => checkin.user_id)).size;
     if (profiles?.length && activeOnDay === profiles.length) collectiveStreak++;
-    else if (day !== currentDay) break;
+    else if (day !== actualToday) break;
   }
   const strongestChallenge = [...challengePulse].sort((a, b) => b.rate - a.rate)[0];
   const needsAttention = [...challengePulse].filter((item) => item.checkins > 0).sort((a, b) => a.rate - b.rate)[0];
   const celebrations = [
-    profiles?.length && todayActive === profiles.length ? 'Everyone checked in today.' : null,
+    profiles?.length && todayActive === profiles.length
+      ? `Everyone checked in ${currentDay === actualToday ? 'today' : `on ${shortDate(currentDay)}`}.`
+      : null,
     collectiveStreak > 1 ? `The whole group has checked in for ${collectiveStreak} days in a row.` : null,
     strongestChallenge?.rate === 100 ? `Every ${strongestChallenge.challenge.name} check-in reached the goal.` : null,
   ].filter(Boolean) as string[];
@@ -439,12 +470,40 @@ export default async function Progress({
         <span className="range-label num">{range} days</span>
       </div>
 
+      {campaign ? (
+        <section className="progress-campaign-card">
+          <div className="between">
+            <div>
+              <p className="eyebrow">{campaign.active ? 'Active campaign' : 'Campaign history'}</p>
+              <h2>{campaign.name}</h2>
+            </div>
+            <span className="campaign-duration num">{campaign.duration_days} days</span>
+          </div>
+          {campaign.description && <p className="muted">{campaign.description}</p>}
+          <p className="campaign-dates num">{campaign.starts_on} → {campaign.ends_on}</p>
+        </section>
+      ) : (
+        <p className="empty">No campaign is available yet.</p>
+      )}
+
+      {campaigns.length > 1 && (
+        <nav className="campaign-picker" aria-label="Campaign history">
+          {campaigns.map((item) => (
+            <Link key={item.id}
+              href={`/semana?view=${view}&days=${range}&challenge=all&campaign=${item.id}`}
+              data-on={item.id === campaign?.id}>
+              {item.name}<small>{item.active ? 'Active' : `${item.starts_on} · ${item.duration_days} days`}</small>
+            </Link>
+          ))}
+        </nav>
+      )}
+
       <nav className="view-picker" aria-label="Progress view">
-        <Link href={`/semana?view=me&days=${range}&challenge=${selectedChallenge}`} data-on={view === 'me'}>
+        <Link href={`/semana?view=me&days=${range}&challenge=${selectedChallenge}&campaign=${campaign?.id ?? ''}`} data-on={view === 'me'}>
           My progress
           <small>Private</small>
         </Link>
-        <Link href={`/semana?view=group&days=${range}&challenge=${selectedChallenge}`} data-on={view === 'group'}>
+        <Link href={`/semana?view=group&days=${range}&challenge=${selectedChallenge}&campaign=${campaign?.id ?? ''}`} data-on={view === 'group'}>
           Group pulse
           <small>Shared</small>
         </Link>
@@ -452,7 +511,7 @@ export default async function Progress({
 
       <nav className="range-picker" aria-label="Progress period">
         {RANGES.map((value) => (
-          <Link key={value} href={`/semana?view=${view}&days=${value}&challenge=${selectedChallenge}`}
+          <Link key={value} href={`/semana?view=${view}&days=${value}&challenge=${selectedChallenge}&campaign=${campaign?.id ?? ''}`}
                 className="range-option" data-on={range === value}>
             {value}
             <small>days</small>
@@ -469,14 +528,14 @@ export default async function Progress({
           </section>
 
           <div className="section-heading">
-            <div><p className="eyebrow">Daily challenges</p><h2>Exact results</h2></div>
+            <div><p className="eyebrow">Campaign activities</p><h2>Exact results</h2></div>
             <span className="privacy-pill">Only you</span>
           </div>
 
-          <nav className="challenge-filter" aria-label="Challenge filter">
-            <Link href={`/semana?view=me&days=${range}&challenge=all`} data-on={selectedChallenge === 'all'}>All</Link>
+          <nav className="challenge-filter" aria-label="Activity filter">
+            <Link href={`/semana?view=me&days=${range}&challenge=all&campaign=${campaign?.id ?? ''}`} data-on={selectedChallenge === 'all'}>All</Link>
             {active.map((challenge) => (
-              <Link key={challenge.id} href={`/semana?view=me&days=${range}&challenge=${challenge.id}`}
+              <Link key={challenge.id} href={`/semana?view=me&days=${range}&challenge=${challenge.id}&campaign=${campaign?.id ?? ''}`}
                     data-on={selectedChallenge === challenge.id}>{challenge.name}</Link>
             ))}
           </nav>
@@ -496,7 +555,7 @@ export default async function Progress({
                   </span>
                 </div>
 
-                <div className="personal-chart" style={{ gridTemplateColumns: `repeat(${range}, minmax(0, 1fr))` }}>
+                <div className="personal-chart" style={{ gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, minmax(0, 1fr))` }}>
                   {item.timeline.map((point) => (
                     <i key={point.day} title={`${shortDate(point.day)}: ${formatValue(point.value, item.challenge)}`}
                        data-today={point.day === currentDay}
@@ -504,7 +563,7 @@ export default async function Progress({
                        style={{ '--bar-height': `${point.value ? Math.max(point.percent, 10) : 5}%` } as CSSProperties} />
                   ))}
                 </div>
-                <div className="chart-axis num"><span>{shortDate(days[0])}</span><span>Today</span></div>
+                <div className="chart-axis num"><span>{shortDate(days[0])}</span><span>{axisEndLabel}</span></div>
 
                 <div className="metric-row">
                   <div><span>Latest</span><strong className="num">{formatValue(item.latest, item.challenge)}</strong></div>
@@ -601,9 +660,9 @@ export default async function Progress({
           <article className="insight-card group-trend-card">
             <div className="between insight-title">
               <div><p className="eyebrow">Momentum</p><h2>Active members by day</h2></div>
-              <strong className="num">{todayActive}/{profiles?.length ?? 0}<small> today</small></strong>
+              <strong className="num">{todayActive}/{profiles?.length ?? 0}<small> {currentDay === actualToday ? 'today' : 'period end'}</small></strong>
             </div>
-            <div className="personal-chart group-chart" style={{ gridTemplateColumns: `repeat(${range}, minmax(0, 1fr))` }}>
+            <div className="personal-chart group-chart" style={{ gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, minmax(0, 1fr))` }}>
               {groupTimeline.map((point) => (
                 <i key={point.day} title={`${shortDate(point.day)}: ${point.activeMembers}/${profiles?.length ?? 0} members`}
                    data-today={point.day === currentDay}
@@ -611,16 +670,16 @@ export default async function Progress({
                    style={{ '--bar-height': `${point.activeMembers ? Math.max(point.percent, 10) : 5}%` } as CSSProperties} />
               ))}
             </div>
-            <div className="chart-axis num"><span>{shortDate(days[0])}</span><span>Today</span></div>
+            <div className="chart-axis num"><span>{shortDate(days[0])}</span><span>{axisEndLabel}</span></div>
             <p className="metric-explainer">Each bar shows how many active members logged at least one challenge that day.</p>
           </article>
 
           <p className="metric-explainer collective-explainer">
-            Full-group streak counts consecutive days when every active member logged at least one challenge. Today counts only after everyone checks in.
+            Full-group streak counts consecutive days when every active member logged at least one activity. {currentDay === actualToday ? 'Today counts only after everyone checks in.' : 'For historical campaigns, the count ends on the campaign period shown.'}
           </p>
 
           <div className="section-heading">
-            <div><p className="eyebrow">By challenge</p><h2>What is working</h2></div>
+            <div><p className="eyebrow">By activity</p><h2>What is working</h2></div>
           </div>
           <div className="pulse-list">
             {challengePulse.map((item) => (
@@ -645,14 +704,14 @@ export default async function Progress({
                   <h3>{person.display_name}</h3>
                   <strong className="num">{person.percent}%</strong>
                 </div>
-                <p className="muted">{person.activeDays}/{range} active days · {plural(person.streak, 'day')} streak</p>
+                <p className="muted">{person.activeDays}/{days.length} active days · {plural(person.streak, 'day')} streak</p>
               </article>
             ))}
           </div>
 
           <div className="section-heading"><div><p className="eyebrow">Positive competition</p><h2>Relative rankings</h2></div></div>
           <div className="ranking-grid">
-            <article><span>Most consistent</span><strong>{consistencyLeader?.display_name ?? '—'}</strong><small>{consistencyLeader ? `${consistencyLeader.activeDays}/${range} active days` : 'No activity yet'}</small></article>
+            <article><span>Most consistent</span><strong>{consistencyLeader?.display_name ?? '—'}</strong><small>{consistencyLeader ? `${consistencyLeader.activeDays}/${days.length} active days` : 'No activity yet'}</small></article>
             <article><span>Longest current streak</span><strong>{streakLeader?.display_name ?? '—'}</strong><small>{streakLeader ? plural(streakLeader.streak, 'day') : 'No streak yet'}</small></article>
             <article><span>Most improved</span><strong>{improvementLeader?.display_name ?? '—'}</strong><small>{improvementLeader?.improvement != null ? `${signedPercent(improvementLeader.improvement)} goal rate` : 'Comparison pending'}</small></article>
             <article><span>Yogic goal days</span><strong>{yogicLeader?.display_name ?? '—'}</strong><small>{yogicLeader ? plural(yogicLeader.yogicGoalDays, 'day') : 'No result yet'}</small></article>

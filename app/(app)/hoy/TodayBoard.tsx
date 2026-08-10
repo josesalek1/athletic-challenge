@@ -7,17 +7,19 @@ import Checklist from '@/components/Checklist';
 import RepsCounter from '@/components/RepsCounter';
 import DoneToggle from '@/components/DoneToggle';
 import { dayLine, waLink, isLogged } from '@/lib/share';
-import type { Challenge, Entry, Payload } from '@/lib/types';
+import type { Campaign, Challenge, Entry, Payload } from '@/lib/types';
 import { isNetworkFailure, queueMutation, queuedEntries, removeQueuedMutation } from '@/lib/offline';
 
 export default function TodayBoard({
   challenges,
+  campaign,
   entries,
   day,
   name,
   userId,
 }: {
   challenges: Challenge[];
+  campaign: Campaign | null;
   entries: Entry[];
   day: string;
   name: string;
@@ -39,16 +41,18 @@ export default function TodayBoard({
     });
   }, [day, userId]);
 
-  // Día N contado desde started_on: igual para todo el grupo,
-  // entre quien entre y cuando entre.
+  // Campaign day is shared by the whole group and comes from its start date.
   const dayNumber = useMemo(() => {
-    const starts = challenges.map((c) => c.started_on).filter(Boolean) as string[];
-    if (!starts.length) return 1;
-    const first = starts.sort()[0];
+    if (!campaign) return 1;
     const ms =
-      new Date(day + 'T12:00:00').getTime() - new Date(first + 'T12:00:00').getTime();
-    return Math.max(1, Math.floor(ms / 86400000) + 1);
-  }, [challenges, day]);
+      new Date(day + 'T12:00:00').getTime() - new Date(campaign.starts_on + 'T12:00:00').getTime();
+    return Math.min(campaign.duration_days, Math.max(1, Math.floor(ms / 86400000) + 1));
+  }, [campaign, day]);
+
+  const campaignLive = Boolean(campaign && day >= campaign.starts_on && day <= campaign.ends_on);
+  const campaignState = !campaign
+    ? 'missing'
+    : day < campaign.starts_on ? 'upcoming' : day > campaign.ends_on ? 'finished' : 'live';
 
   async function save(challengeId: string, payload: Payload) {
     setLocal((l) => ({ ...l, [challengeId]: payload }));
@@ -115,12 +119,30 @@ export default function TodayBoard({
         })}
       </p>
       <h1 className="display today-title">
-        Athletic Challenge <span>· Day {dayNumber}</span>
+        {campaign?.name ?? 'Athletic Challenge'} <span>· Day {dayNumber} of {campaign?.duration_days ?? '—'}</span>
       </h1>
 
-      {challenges.length === 0 ? (
+      {campaign && (
+        <section className="campaign-summary" data-state={campaignState}>
+          <div className="between">
+            <strong>{campaignState === 'live' ? 'Active campaign' : campaignState === 'upcoming' ? 'Upcoming campaign' : 'Campaign complete'}</strong>
+            <span className="num">{campaign.starts_on} → {campaign.ends_on}</span>
+          </div>
+          {campaign.description && <p>{campaign.description}</p>}
+        </section>
+      )}
+
+      {!campaign ? (
+        <p className="empty">There is no active campaign. Ask an administrator to activate one.</p>
+      ) : !campaignLive ? (
         <p className="empty">
-          No active challenge.
+          {campaignState === 'upcoming'
+            ? `This campaign begins on ${campaign.starts_on}.`
+            : `This campaign ended on ${campaign.ends_on}. Your history remains available in Progress.`}
+        </p>
+      ) : challenges.length === 0 ? (
+        <p className="empty">
+          This campaign has no active activities.
           <br />
           Ask an administrator to activate one from the Admin panel.
         </p>
