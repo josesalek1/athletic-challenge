@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { clearOfflineData } from '@/lib/offline';
+import { clearOfflineData, flushOfflineQueue, pendingMutationCount } from '@/lib/offline';
 
 type Feedback = { tone: 'success' | 'error'; text: string } | null;
 
@@ -85,12 +85,32 @@ export default function ProfileSettings({
   }
 
   async function signOut(scope: 'local' | 'global') {
-    if (scope === 'global' && !window.confirm('Sign out of Athletic Challenge on every device?')) {
+    setSignOutBusy(true);
+    setAccountFeedback(null);
+    let remaining = 0;
+    try {
+      remaining = await pendingMutationCount();
+      if (remaining > 0 && navigator.onLine) {
+        const result = await flushOfflineQueue(supabase);
+        remaining = result.remaining;
+      }
+    } catch {
+      setSignOutBusy(false);
+      setAccountFeedback({ tone: 'error', text: 'The app could not verify your pending offline changes. Try again before signing out.' });
       return;
     }
 
-    setSignOutBusy(true);
-    setAccountFeedback(null);
+    if (remaining > 0 && !window.confirm(`${remaining} unsynced ${remaining === 1 ? 'change is' : 'changes are'} still stored on this device. Signing out now will permanently delete ${remaining === 1 ? 'it' : 'them'}. Sign out anyway?`)) {
+      setSignOutBusy(false);
+      setAccountFeedback({ tone: 'success', text: `${remaining} unsynced ${remaining === 1 ? 'change remains' : 'changes remain'} safely stored on this device.` });
+      return;
+    }
+
+    if (scope === 'global' && !window.confirm('Sign out of Athletic Challenge on every device?')) {
+      setSignOutBusy(false);
+      return;
+    }
+
     const { error } = await supabase.auth.signOut({ scope });
     if (error) {
       setSignOutBusy(false);

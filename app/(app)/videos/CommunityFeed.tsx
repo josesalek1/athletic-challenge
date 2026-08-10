@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 export type FeedPost = {
@@ -62,6 +62,21 @@ function friendlyTime(value: string) {
   return new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function friendlyFeedError(error: unknown, action: 'post' | 'comment' | 'moderate') {
+  const details = typeof error === 'object' && error
+    ? error as { code?: string; message?: string }
+    : {};
+  const permissionError = details.code === '42501'
+    || details.code === 'PGRST301'
+    || /row-level security|permission denied|jwt/i.test(details.message ?? '');
+  if (permissionError) return 'Your session or permissions changed. Refresh the app and try again.';
+  if (details.code === '23514' && action === 'post') return 'Use a title between 2 and 80 characters, a description under 500 characters and a valid video link.';
+  if (details.code === '23514' && action === 'comment') return 'Comments must contain between 1 and 100 characters.';
+  if (action === 'post') return 'The video could not be shared. Check the title, description and link, then try again.';
+  if (action === 'comment') return 'The comment could not be saved. Check that it is no longer than 100 characters and try again.';
+  return 'This moderation action could not be completed. Refresh the app and try again.';
+}
+
 export default function CommunityFeed({
   currentUserId,
   isAdmin,
@@ -85,6 +100,7 @@ export default function CommunityFeed({
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState('');
   const [feedback, setFeedback] = useState<Feedback>(null);
+  const commentLocks = useRef(new Set<string>());
   const peopleById = useMemo(() => new Map(people.map((person) => [person.id, person.display_name])), [people]);
 
   function authorName(userId: string | null) {
@@ -110,7 +126,7 @@ export default function CommunityFeed({
       .single();
     setBusy('');
     if (error || !data) {
-      setFeedback({ tone: 'error', text: error?.message || 'The video could not be shared.' });
+      setFeedback({ tone: 'error', text: friendlyFeedError(error, 'post') });
       return;
     }
     setPosts((items) => [data as FeedPost, ...items]);
@@ -137,19 +153,25 @@ export default function CommunityFeed({
   }
 
   async function addComment(videoId: string) {
+    if (commentLocks.current.has(videoId)) return;
     const body = (commentDrafts[videoId] ?? '').trim();
     if (!body || body.length > 100) return;
+    commentLocks.current.add(videoId);
     setBusy(`comment-${videoId}`);
     setFeedback(null);
-    const { data, error } = await supabase
-      .from('video_comments')
-      .insert({ video_id: videoId, user_id: currentUserId, body })
-      .select('id, video_id, user_id, body, hidden, created_at')
-      .single();
-    setBusy('');
-    if (error || !data) { setFeedback({ tone: 'error', text: error?.message || 'The comment could not be added.' }); return; }
-    setComments((items) => [...items, data as FeedComment]);
-    setCommentDrafts((items) => ({ ...items, [videoId]: '' }));
+    try {
+      const { data, error } = await supabase
+        .from('video_comments')
+        .insert({ video_id: videoId, user_id: currentUserId, body })
+        .select('id, video_id, user_id, body, hidden, created_at')
+        .single();
+      if (error || !data) { setFeedback({ tone: 'error', text: friendlyFeedError(error, 'comment') }); return; }
+      setComments((items) => [...items, data as FeedComment]);
+      setCommentDrafts((items) => ({ ...items, [videoId]: '' }));
+    } finally {
+      commentLocks.current.delete(videoId);
+      setBusy('');
+    }
   }
 
   async function deleteComment(comment: FeedComment) {
@@ -165,7 +187,7 @@ export default function CommunityFeed({
     setBusy(`comment-${comment.id}`);
     const { error } = await supabase.rpc('admin_moderate_video_comment', { target_comment_id: comment.id, should_hide: !comment.hidden });
     setBusy('');
-    if (error) { setFeedback({ tone: 'error', text: error.message || 'The comment could not be moderated.' }); return; }
+    if (error) { setFeedback({ tone: 'error', text: friendlyFeedError(error, 'moderate') }); return; }
     setComments((items) => items.map((item) => item.id === comment.id ? { ...item, hidden: !item.hidden } : item));
   }
 
@@ -174,7 +196,7 @@ export default function CommunityFeed({
     setBusy(`post-${post.id}`);
     const { error } = await supabase.rpc('admin_moderate_video', { target_video_id: post.id, should_hide: shouldHide });
     setBusy('');
-    if (error) { setFeedback({ tone: 'error', text: error.message || 'The post could not be moderated.' }); return; }
+    if (error) { setFeedback({ tone: 'error', text: friendlyFeedError(error, 'moderate') }); return; }
     setPosts((items) => items.map((item) => item.id === post.id ? { ...item, status: shouldHide ? 'hidden' : 'published' } : item));
   }
 
@@ -243,7 +265,7 @@ export default function CommunityFeed({
                 </div>)}
                 {post.status === 'published' && <div className="feed-comment-form">
                   <div className="between"><label htmlFor={`comment-${post.id}`}>Add a short comment</label><small className="num">{commentDraft.length}/100</small></div>
-                  <div className="row"><input id={`comment-${post.id}`} maxLength={100} placeholder="Keep it constructive" value={commentDraft} onChange={(event) => setCommentDrafts((items) => ({ ...items, [post.id]: event.target.value }))} onKeyDown={(event) => { if (event.key === 'Enter' && commentDraft.trim()) addComment(post.id); }} /><button className="btn-water" disabled={!commentDraft.trim() || busy === `comment-${post.id}`} onClick={() => addComment(post.id)}>Send</button></div>
+                  <div className="row"><input id={`comment-${post.id}`} maxLength={100} placeholder="Keep it constructive" value={commentDraft} onChange={(event) => setCommentDrafts((items) => ({ ...items, [post.id]: event.target.value }))} onKeyDown={(event) => { if (event.key === 'Enter' && commentDraft.trim() && busy !== `comment-${post.id}`) { event.preventDefault(); void addComment(post.id); } }} /><button className="btn-water" disabled={!commentDraft.trim() || busy === `comment-${post.id}`} onClick={() => addComment(post.id)}>Send</button></div>
                 </div>}
               </div>
 

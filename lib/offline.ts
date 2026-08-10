@@ -198,7 +198,10 @@ async function serverIsNewer(supabase: SupabaseClient, mutation: OfflineMutation
   }
   const { data, error } = await query.maybeSingle();
   if (error) throw error;
-  return Boolean(data?.updated_at && String(data.updated_at) > mutation.queued_at);
+  if (!data?.updated_at) return false;
+  const serverTime = new Date(String(data.updated_at)).getTime();
+  const queuedTime = new Date(mutation.queued_at).getTime();
+  return Number.isFinite(serverTime) && Number.isFinite(queuedTime) && serverTime > queuedTime;
 }
 
 async function syncMutation(supabase: SupabaseClient, mutation: OfflineMutation) {
