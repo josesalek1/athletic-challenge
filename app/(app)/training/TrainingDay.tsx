@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { PLAN, PROGRESSION, type Exercise } from '@/lib/plan';
@@ -261,6 +262,9 @@ export default function TrainingDay({
       <p className="eyebrow">Private · only you</p>
       <h1 className="display" style={{ fontSize: 34, margin: '8px 0 6px' }}>{slot.name}</h1>
       <p className="muted" style={{ marginBottom: 16 }}>{slot.intent}</p>
+      <Link href="/videos" className="btn btn-ghost" style={{ width: '100%', marginBottom: 16 }}>
+        Exercise technique library
+      </Link>
 
       <div className="chips">
         {PLAN.filter((s) => s.kind !== 'rest').map((s) => (

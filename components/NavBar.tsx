@@ -7,7 +7,6 @@ const TABS = [
   { href: '/hoy',      icon: '◉', label: 'Today' },
   { href: '/semana',   icon: '▤', label: 'Progress' },
   { href: '/training', icon: '≋', label: 'Training' },
-  { href: '/videos',   icon: '▶', label: 'Videos' },
   { href: '/settings', icon: '•••', label: 'More' },
 ];
 
