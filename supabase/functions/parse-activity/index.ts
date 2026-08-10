@@ -27,16 +27,10 @@ function requireSecret(name: string) {
 }
 
 function responseText(payload: Record<string, unknown>) {
-  const output = Array.isArray(payload.output) ? payload.output : []
-  for (const item of output) {
-    if (!item || typeof item !== 'object') continue
-    const content = Array.isArray((item as { content?: unknown[] }).content)
-      ? (item as { content: unknown[] }).content
-      : []
-    for (const part of content) {
-      if (part && typeof part === 'object' && (part as { type?: string }).type === 'output_text') {
-        return String((part as { text?: string }).text ?? '')
-      }
+  const content = Array.isArray(payload.content) ? payload.content : []
+  for (const part of content) {
+    if (part && typeof part === 'object' && (part as { type?: string }).type === 'text') {
+      return String((part as { text?: string }).text ?? '')
     }
   }
   return ''
@@ -77,18 +71,18 @@ Deno.serve(async (request) => {
       return Response.json({ error: 'A more detailed activity description is required' }, { status: 400, headers: CORS_HEADERS })
     }
 
-    const openAiResponse = await fetch('https://api.openai.com/v1/responses', {
+    const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${requireSecret('OPENAI_API_KEY')}`,
+        'x-api-key': requireSecret('ANTHROPIC_API_KEY'),
+        'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5.4-nano',
-        store: false,
-        reasoning: { effort: 'none' },
-        max_output_tokens: 500,
-        instructions: [
+        model: 'claude-sonnet-5',
+        max_tokens: 1000,
+        thinking: { type: 'disabled' },
+        system: [
           'Convert the administrator description into one fitness activity.',
           'Preserve the language used by the administrator for name and description.',
           'Timed targets must always be returned in seconds.',
@@ -96,12 +90,10 @@ Deno.serve(async (request) => {
           'For checklist activities, checklist_items contains the item names. Otherwise it is empty.',
           'Choose exactly one allowed category. Never invent facts that were not implied by the description.',
         ].join(' '),
-        input: prompt,
-        text: {
+        messages: [{ role: 'user', content: prompt }],
+        output_config: {
           format: {
             type: 'json_schema',
-            name: 'activity_draft',
-            strict: true,
             schema: {
               type: 'object',
               additionalProperties: false,
@@ -120,14 +112,17 @@ Deno.serve(async (request) => {
       }),
     })
 
-    if (!openAiResponse.ok) {
-      const detail = await openAiResponse.text()
-      console.error('OpenAI activity parser failed', openAiResponse.status, detail)
+    if (!claudeResponse.ok) {
+      const detail = await claudeResponse.text()
+      console.error('Claude activity parser failed', claudeResponse.status, detail)
       return Response.json({ error: 'AI assistance is temporarily unavailable' }, { status: 502, headers: CORS_HEADERS })
     }
-    const openAiPayload = await openAiResponse.json() as Record<string, unknown>
-    const text = responseText(openAiPayload)
-    if (!text) throw new Error('OpenAI returned no activity draft')
+    const claudePayload = await claudeResponse.json() as Record<string, unknown>
+    if (claudePayload.stop_reason === 'refusal' || claudePayload.stop_reason === 'max_tokens') {
+      throw new Error(`Claude stopped with reason ${claudePayload.stop_reason}`)
+    }
+    const text = responseText(claudePayload)
+    if (!text) throw new Error('Claude returned no activity draft')
 
     return Response.json({ activity: JSON.parse(text) }, { headers: CORS_HEADERS })
   } catch (error) {

@@ -539,8 +539,8 @@ export default function AdminPanel({
     setFeedback({
       tone: 'success',
       text: !error && data?.activity
-        ? 'AI draft ready. Review every field before continuing.'
-        : 'AI was unavailable, so a private local draft was prepared instead. Review every field before continuing.',
+        ? 'Claude draft ready. Review every field before continuing.'
+        : 'Claude was unavailable, so a private local draft was prepared instead. Review every field before continuing.',
     });
   }
 
@@ -705,8 +705,8 @@ export default function AdminPanel({
               <div className="activity-ai-box">
                 <label htmlFor="activity-prompt">Optional · describe it naturally</label>
                 <textarea id="activity-prompt" rows={4} maxLength={1000} placeholder="Example: Create a 90-second plank for the strength category. Keep the core tight and hips level." value={activityPrompt} onChange={(event) => setActivityPrompt(event.target.value)} />
-                <button className="btn-ghost activity-ai-button" disabled={aiBusy || activityPrompt.trim().length < 8} onClick={generateActivityDraft}>{aiBusy ? 'Generating with AI…' : 'Generate draft with AI'}</button>
-                <small className="activity-ai-privacy">Only this description is sent to OpenAI. No member or activity history is included.</small>
+                <button className="btn-ghost activity-ai-button" disabled={aiBusy || activityPrompt.trim().length < 8} onClick={generateActivityDraft}>{aiBusy ? 'Generating with Claude…' : 'Generate draft with Claude'}</button>
+                <small className="activity-ai-privacy">Only this description is sent to Claude. No member or activity history is included.</small>
               </div>
               <div className="activity-form-divider"><span>Or configure manually</span></div>
               <div className="admin-form-grid">
