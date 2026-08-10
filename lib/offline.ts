@@ -185,47 +185,13 @@ function errorMessage(error: unknown) {
   return 'Sync failed.';
 }
 
-async function serverIsNewer(supabase: SupabaseClient, mutation: OfflineMutation) {
-  let query;
-  if (mutation.type === 'entry') {
-    query = supabase.from('entries').select('updated_at').eq('user_id', mutation.user_id).eq('day', mutation.day).eq('challenge_id', mutation.challenge_id);
-  } else if (mutation.type === 'training_set') {
-    query = supabase.from('training_sets').select('updated_at').eq('user_id', mutation.user_id).eq('day', mutation.day).eq('slot', mutation.slot).eq('exercise_key', mutation.exercise_key).eq('set_index', mutation.set_index);
-  } else if (mutation.type === 'training_session') {
-    query = supabase.from('training_sessions').select('updated_at').eq('user_id', mutation.user_id).eq('day', mutation.day).eq('slot', mutation.slot);
-  } else {
-    query = supabase.from('swim_sessions').select('updated_at').eq('user_id', mutation.user_id).eq('day', mutation.day);
-  }
-  const { data, error } = await query.maybeSingle();
-  if (error) throw error;
-  if (!data?.updated_at) return false;
-  const serverTime = new Date(String(data.updated_at)).getTime();
-  const queuedTime = new Date(mutation.queued_at).getTime();
-  return Number.isFinite(serverTime) && Number.isFinite(queuedTime) && serverTime > queuedTime;
-}
-
 async function syncMutation(supabase: SupabaseClient, mutation: OfflineMutation) {
-  if (await serverIsNewer(supabase, mutation)) return null;
-  if (mutation.type === 'entry') {
-    return (await supabase.from('entries').upsert({
-      user_id: mutation.user_id, day: mutation.day, challenge_id: mutation.challenge_id, payload: mutation.payload,
-    }, { onConflict: 'user_id,challenge_id,day' })).error;
-  }
-  if (mutation.type === 'training_set') {
-    return (await supabase.from('training_sets').upsert({
-      user_id: mutation.user_id, day: mutation.day, slot: mutation.slot, exercise_key: mutation.exercise_key,
-      set_index: mutation.set_index, weight_kg: mutation.weight_kg, reps: mutation.reps, seconds: mutation.seconds,
-    }, { onConflict: 'user_id,day,slot,exercise_key,set_index' })).error;
-  }
-  if (mutation.type === 'training_session') {
-    return (await supabase.from('training_sessions').upsert({
-      user_id: mutation.user_id, day: mutation.day, slot: mutation.slot, done: mutation.done,
-    }, { onConflict: 'user_id,day,slot' })).error;
-  }
-  return (await supabase.from('swim_sessions').upsert({
-    user_id: mutation.user_id, day: mutation.day, distance_m: mutation.distance_m, duration_s: mutation.duration_s,
-    stroke: mutation.stroke, rpe: mutation.rpe, notes: mutation.notes,
-  }, { onConflict: 'user_id,day' })).error;
+  const { error } = await supabase.rpc('sync_offline_mutation', {
+    mutation_kind: mutation.type,
+    mutation_data: mutation,
+    mutation_queued_at: mutation.queued_at,
+  });
+  return error;
 }
 
 export async function flushOfflineQueue(supabase: SupabaseClient) {

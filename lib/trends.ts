@@ -21,13 +21,19 @@ export function classifyTrend(
 export function movingAverage<T extends { day: string }>(
   rows: T[],
   value: (row: T) => number,
-  windowSize = 7
+  windowDays = 7
 ) {
   const ordered = [...rows].sort((a, b) => a.day.localeCompare(b.day));
-  return ordered.flatMap((row, index) => {
-    if (index < windowSize - 1) return [];
-    const window = ordered.slice(index - windowSize + 1, index + 1);
-    return [{ day: row.day, value: window.reduce((sum, item) => sum + value(item), 0) / windowSize }];
+  return ordered.map((row) => {
+    const end = new Date(`${row.day}T12:00:00`);
+    const start = new Date(end);
+    start.setDate(start.getDate() - windowDays + 1);
+    const startDay = start.toISOString().slice(0, 10);
+    const window = ordered.filter((item) => item.day >= startDay && item.day <= row.day);
+    return {
+      day: row.day,
+      value: window.reduce((sum, item) => sum + value(item), 0) / window.length,
+    };
   });
 }
 

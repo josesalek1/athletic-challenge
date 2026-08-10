@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { clearOfflineData, flushOfflineQueue } from '@/lib/offline';
 import type { Campaign } from '@/lib/types';
 
 type Feedback = { tone: 'success' | 'error'; text: string } | null;
@@ -48,6 +49,7 @@ export default function CampaignControl({
       target_campaign_id: campaign.id,
       new_start: startsOn,
       new_end: endsOn,
+      confirmation: dateConfirmation,
     });
     setBusy(false);
     if (error) {
@@ -72,12 +74,14 @@ export default function CampaignControl({
     setFeedback(null);
     const { error } = await supabase.rpc('admin_reset_campaign_activity', {
       target_campaign_id: campaign.id,
+      confirmation: campaignConfirmation,
     });
     setBusy(false);
     if (error) {
       setFeedback({ tone: 'error', text: 'Campaign activity could not be reset.' });
       return;
     }
+    await flushOfflineQueue(supabase).catch(() => undefined);
     setCampaignConfirmation('');
     setFeedback({ tone: 'success', text: `All activity for ${campaign.name} was deleted.` });
     router.refresh();
@@ -96,6 +100,7 @@ export default function CampaignControl({
       setFeedback({ tone: 'error', text: 'All activity could not be reset.' });
       return;
     }
+    await clearOfflineData();
     setAllConfirmation('');
     setFeedback({ tone: 'success', text: 'All member activity was deleted.' });
     router.refresh();

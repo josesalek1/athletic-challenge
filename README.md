@@ -1,129 +1,120 @@
-# Lane 5
+# Athletic Challenge
 
-El parte diario de un grupo de cinco. Registras el reto del día en la app,
-lo mandas al grupo de WhatsApp con un toque, y la natación queda solo para ti.
+Aplicación web instalable para un grupo privado que registra retos diarios,
+entrenamiento, natación, hábitos y métricas corporales. Está construida con
+Next.js 15, TypeScript, Supabase y Vercel.
 
-Next.js 15 + Supabase + Vercel. Todo en capa gratuita.
+## Funciones actuales
 
----
+- Acceso sin contraseña mediante invitación y magic link.
+- Campaña grupal con fecha oficial de inicio y fin; el inicio siempre es
+  `Day 1` para todos.
+- Actividades configurables por datos: `timed`, `reps`, `checklist` y
+  `done`.
+- Resultados exactos privados. El grupo solo recibe el booleano de objetivo
+  cumplido almacenado en `group_checkins`.
+- Hábitos privados creados por cada miembro.
+- Progress con periodos de 7, 14, 30, 60 y 90 días, tendencias de hábitos,
+  fuerza, natación y peso.
+- Plan personal de entrenamiento, registro de series, sesiones y natación.
+- Métricas corporales privadas.
+- Biblioteca de técnica con enlaces permitidos de YouTube, Vimeo y Google
+  Drive.
+- Panel de administración para miembros, campañas, actividades, vídeos,
+  invitaciones, fechas oficiales y reinicios.
+- Cola offline en IndexedDB para resultados, series, sesiones y natación.
+  Algunas pantallas y operaciones todavía requieren conexión.
 
-## Orden de montaje (~5 h)
+## Privacidad y autorización
 
-Despliega vacío en los primeros 30 minutos. El fallo clásico es dejar el deploy
-para el final y descubrir que las variables de entorno no estaban puestas.
+La autorización vive en Postgres:
 
-### 1 · Supabase (30 min)
+- RLS limita `entries`, `training_sets`, `training_sessions`,
+  `swim_sessions` y `body_metrics` a su propietario.
+- Los clientes no necesitan filtrar esas tablas por `user_id`; una consulta
+  ajena obtiene cero filas.
+- `group_checkins` contiene únicamente el estado compartido del objetivo.
+- Los hábitos con `visibility = 'private'` no generan check-ins ni aparecen
+  en el mensaje de WhatsApp.
+- Los GRANT por columna impiden modificar campos sensibles de los retos desde
+  un cliente manipulado.
+- Las acciones administrativas usan funciones `security definer` que
+  comprueban `is_admin()`.
 
-1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. Abre **SQL Editor** y pega entero `supabase/schema.sql`.
-   **Antes de ejecutar, cambia los 5 correos** del bloque `allowed_emails`.
-3. **Authentication → Providers**: deja solo *Email* activo y marca
-   *Confirm email*. Desactiva el registro con contraseña.
-4. **Authentication → URL Configuration**: añade a *Redirect URLs*
-   `http://localhost:3000/auth/callback` y, cuando tengas el dominio de Vercel,
-   `https://tu-app.vercel.app/auth/callback`.
-5. Comprueba que RLS quedó activo: descomenta y ejecuta el `select` del final
-   del esquema. Las 6 tablas deben salir con `rls = true`.
+## Preparación local
 
-### 2 · Local (20 min)
+Requisitos: Node.js compatible con Next.js 15 y un proyecto de Supabase.
 
 ```bash
 npm install
-cp .env.example .env.local   # y rellena las tres claves
+cp .env.example .env.local
 npm run dev
 ```
 
-### 3 · Vercel (20 min)
+Variables públicas:
 
-Sube el repo a GitHub, importa en Vercel, pega las mismas variables de entorno
-(con `NEXT_PUBLIC_SITE_URL` apuntando ya al dominio de Vercel) y despliega.
-Vuelve al paso 1.4 a añadir la URL de producción.
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SITE_URL`
+- `NEXT_PUBLIC_WHATSAPP_GROUP` (opcional)
 
-### 4 · Instalar en los móviles (30 min)
+La integración de correo y la función de asistencia con Claude usan secretos
+configurados en Supabase, nunca variables públicas del navegador.
 
-Cada uno abre el enlace en el navegador del teléfono:
+## Base de datos
 
-- **iPhone**: Safari → Compartir → *Añadir a pantalla de inicio*.
-  Tiene que ser Safari; en Chrome de iOS no aparece la opción.
-- **Android**: Chrome → menú → *Instalar aplicación*.
+En un proyecto nuevo, ejecuta en orden:
 
-Queda con icono y a pantalla completa. No hace falta App Store ni cuenta de
-desarrollador.
+1. `supabase/schema.sql`
+2. `supabase/migration-v2.sql` hasta `supabase/migration-v16.sql`
 
----
+Las migraciones se aplican manualmente en el SQL Editor de Supabase. No edites
+una migración que ya fue ejecutada; crea la siguiente versión.
 
-## Cómo funciona cada cosa
+`migration-v16.sql`:
 
-### Los retos son datos, no código
+- valida en el servidor las confirmaciones de Campaign control;
+- evita que una cola offline anterior vuelva a crear actividad reiniciada;
+- corrige los permisos por columna de `challenges`;
+- restringe nuevos vídeos a YouTube, Vimeo y Google Drive.
 
-La tabla `challenges` tiene una fila por reto y una columna `kind` que decide
-qué interfaz se pinta:
+Después de ejecutar las migraciones, configura en Supabase:
 
-| `kind` | Interfaz | `payload` guardado |
-|---|---|---|
-| `timed` | Reloj circular | `{"seconds": 187}` |
-| `reps` | Contador ± | `{"reps": 25}` |
-| `checklist` | Los 7 componentes | `{"done": ["pranayama","surya"]}` |
+- Authentication con Email y magic links.
+- La URL de producción y `/auth/callback` entre las redirect URLs.
+- El hook de correo transaccional y sus secretos.
+- Los secretos de la función que interpreta actividades con Claude.
 
-Para el challenge 6 insertas una fila y pones `active = true`. Sin migración y
-sin tocar el código. Los cuatro anteriores están cargados con `active = false`,
-así que el historial se conserva y el tablero no se ensucia.
+## Rutas
 
-Para cambiar la meta diaria del reto yóguico (Marco propuso 3 de 7), edita
-`config.daily_goal` en esa fila.
+La navegación principal tiene cuatro pestañas:
 
-### La natación es privada de verdad
+- `/hoy` — Today
+- `/semana` — Progress
+- `/training` — Training
+- `/settings` — More
 
-`swim_sessions` tiene una sola política de RLS:
+Rutas adicionales:
 
-```sql
-using (user_id = auth.uid()) with check (user_id = auth.uid())
+- `/videos` — biblioteca de técnica, enlazada desde Training
+- `/admin` — administración, solo para administradores
+- `/login` y `/auth/callback` — acceso
+- `/offline` — estado sin conexión
+
+## Verificación antes de un commit
+
+```bash
+npx tsc --noEmit
+npm run build
 ```
 
-Postgres devuelve cero filas a cualquier otro, aunque manipulen el cliente. La
-garantía vive en la base de datos, no en un `if` del frontend. Por eso la
-consulta de `app/(app)/natacion/page.tsx` no filtra por usuario: no le hace falta.
+Ambos comandos deben terminar sin errores. El build debe seguir generando
+`/videos`, aunque esa ruta no aparezca en la barra principal.
 
-### WhatsApp: un toque, no cero
+## Límites conocidos
 
-No hay envío automático. La API oficial de WhatsApp Business exige cuenta de
-empresa y verificación de Meta — días, no horas. Las librerías no oficiales
-(Baileys, whatsapp-web.js) necesitan un dispositivo siempre encendido, violan
-los términos y el número puede acabar baneado.
-
-En su lugar, el botón abre WhatsApp con el mensaje ya escrito
-(`Día 27 ✅ Reto yóguico 1,2,5 (3/7)`). Eliges el grupo y pulsas enviar.
-
-El formato del mensaje se decide en un solo sitio: `lib/share.ts`, función
-`dayLine`. Si el grupo escribe en inglés, cámbialo ahí y cambia en toda la app.
-
-### Vídeos
-
-No alojamos nada. El entrenador sube a YouTube en modo **no listado** o a Drive,
-y pegas el enlace en la tabla `videos`. La app lo reproduce embebido. Le cuesta
-30 segundos por vídeo y para vosotros cinco es indistinguible de tenerlo dentro.
-
----
-
-## Lo que falta a propósito
-
-Un MVP de medio día. Si sobrevive a la semana tres, esto es lo siguiente:
-
-- **Recordatorio diario.** Una función programada de Supabase a las 20:00 que
-  avise a quien no haya registrado. Requiere notificaciones push.
-- **Importar el historial.** WhatsApp exporta el chat en `.txt`
-  (info del grupo → *Exportar chat*, sin multimedia). Un script que parsee los
-  `Day N ✅` y rellene `entries` recupera los cuatro retos desde diciembre.
-- **Modo sin conexión.** Ahora mismo guardar necesita red. Una cola en
-  IndexedDB lo arregla.
-- **Gráficas de natación.** Ritmo por 100 m a lo largo del tiempo.
-
-## Notas
-
-- `today()` en `lib/format.ts` usa fecha local a propósito. Con UTC, un registro
-  a las 23:30 caería en el día siguiente.
-- Los correos de `allowed_emails` no son legibles desde el cliente: la tabla
-  tiene RLS activado y ninguna política. El trigger la consulta con
-  `security definer`, así que sigue funcionando.
-- La vista `week_board` usa `security_invoker = on`. Sin eso, una vista puede
-  saltarse las políticas del que consulta y filtrar datos privados.
+- No hay notificaciones push automáticas.
+- No hay chat, comentarios ni reacciones.
+- El modo offline es parcial y no cubre todas las operaciones.
+- No existe una aplicación nativa en App Store o Google Play; es una PWA.
+- La sesión debe verificarse una vez en cada dispositivo o navegador nuevo.

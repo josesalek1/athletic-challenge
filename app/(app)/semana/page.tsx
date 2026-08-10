@@ -234,6 +234,11 @@ export default async function Progress({
     const currentAverage = average(values);
     const previousAverage = average(previousValues);
     const change = changePercent(currentAverage, previousAverage);
+    const trendDataDays = new Set([
+      ...periodEntries.filter((entry) => entry.challenge_id === challenge.id).map((entry) => entry.day),
+      ...previousEntries.filter((entry) => entry.challenge_id === challenge.id).map((entry) => entry.day),
+    ]).size;
+    const enoughTrendData = trendDataDays >= 7 && values.length > 0 && previousValues.length > 0;
     const historicBest = historicValues.length ? Math.max(...historicValues) : 0;
     let goalStreak = 0;
     for (let index = allDays.length - 1; index >= 0; index--) {
@@ -242,11 +247,13 @@ export default async function Progress({
       if (streakValue >= target) goalStreak++;
       else if (streakDay !== actualToday) break;
     }
-    const trendLabel = change == null
+    const trendLabel = !enoughTrendData || change == null
       ? 'Not enough data'
       : change > 2 ? 'Improving' : change < -2 ? 'Declining' : 'Holding steady';
     const insight = !values.length
       ? `No ${challenge.name} result has been logged in this period yet.`
+      : !enoughTrendData
+      ? 'At least seven logged days across both periods are required for a trend.'
       : previousValues.length
       ? change === 0
         ? `Your ${challenge.name} average stayed steady versus the previous ${range} days.`

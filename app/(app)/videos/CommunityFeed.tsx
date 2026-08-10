@@ -27,7 +27,20 @@ function embedUrl(url: string) {
 function validExternalUrl(value: string) {
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' || url.protocol === 'http:';
+    const allowedHosts = new Set([
+      'youtube.com',
+      'www.youtube.com',
+      'm.youtube.com',
+      'music.youtube.com',
+      'youtu.be',
+      'vimeo.com',
+      'www.vimeo.com',
+      'player.vimeo.com',
+      'drive.google.com',
+    ]);
+    return (url.protocol === 'https:' || url.protocol === 'http:')
+      && allowedHosts.has(url.hostname.toLowerCase())
+      && embedUrl(value) !== null;
   } catch {
     return false;
   }
@@ -45,7 +58,7 @@ function friendlyLibraryError(error: unknown, action: LibraryAction) {
   if (permissionError) return 'Your session or permissions changed. Refresh the app and try again.';
   if (/videos_title_length_check/i.test(message)) return 'The title must be between 2 and 80 characters.';
   if (/videos_description_length_check/i.test(message)) return 'The description must be 500 characters or fewer.';
-  if (/videos_url_protocol_check/i.test(message)) return 'Enter a valid http or https video link.';
+  if (/videos_(url_protocol|allowed_host)_check/i.test(message)) return 'Use a YouTube, Vimeo or Google Drive video link.';
   if (action === 'delete') return 'The video could not be deleted. Refresh the app and try again.';
   return 'The video could not be added. Check the title, description and link, then try again.';
 }
@@ -76,7 +89,7 @@ export default function CommunityFeed({
       return;
     }
     if (!validExternalUrl(url)) {
-      setFeedback({ tone: 'error', text: 'Enter a valid http or https video link.' });
+      setFeedback({ tone: 'error', text: 'Use a YouTube, Vimeo or Google Drive video link.' });
       return;
     }
     if (description.length > 500) {
@@ -165,7 +178,7 @@ export default function CommunityFeed({
               {post.description && <p className="feed-description">{post.description}</p>}
               {source
                 ? <div className="feed-video"><iframe src={source} title={post.title} allow="accelerometer; encrypted-media; picture-in-picture; fullscreen" allowFullScreen /></div>
-                : <a className="btn btn-ghost feed-open" href={post.url} target="_blank" rel="noopener noreferrer">Open external video</a>}
+                : <p className="muted">This video uses an unsupported link.</p>}
               {(post.created_by === currentUserId || isAdmin) && (
                 <footer className="feed-post-actions">
                   <button type="button" className="btn-ghost" disabled={busy} onClick={() => deletePost(post)}>Delete video</button>
