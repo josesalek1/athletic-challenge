@@ -136,7 +136,6 @@ export default async function Progress({
     supabase.from('body_metrics').select('user_id, day, weight_kg, waist_cm, note').gte('day', trendStart),
   ]);
   const active = (challenges ?? []) as Challenge[];
-  const privateHabits = active;
   const privateBodyMetrics = (bodyMetrics ?? []) as BodyMetric[];
   const privateEntries = (entries ?? []) as Entry[];
   const periodEntries = privateEntries.filter((entry) => days.includes(entry.day));
@@ -230,54 +229,6 @@ export default async function Progress({
   const visibleChallenges = selectedChallenge === 'all'
     ? challengeProgress
     : challengeProgress.filter((item) => item.challenge.id === selectedChallenge);
-
-  const habitEntries = privateEntries.filter((entry) =>
-    privateHabits.some((habit) => habit.id === entry.challenge_id)
-  );
-  const habitTrendProgress = privateHabits.map((habit) => {
-    const currentHabitDays = trendDays.filter((day) => !habit.started_on || day >= habit.started_on);
-    const previousHabitDays = trendPreviousDays.filter((day) => !habit.started_on || day >= habit.started_on);
-    const rows = habitEntries.filter((entry) => entry.challenge_id === habit.id);
-    const byDay = new Map(rows.map((entry) => [entry.day, entry]));
-    const currentRows = rows.filter((entry) => trendDays.includes(entry.day));
-    const previousRows = rows.filter((entry) => trendPreviousDays.includes(entry.day));
-    const currentValues = currentHabitDays.map((day) => valueFor(byDay.get(day), habit));
-    const previousValues = previousHabitDays.map((day) => valueFor(byDay.get(day), habit));
-    const currentAverage = average(currentValues);
-    const previousAverage = average(previousValues);
-    const rawChange = precisePercentChange(currentAverage, previousAverage);
-    const dataDays = new Set([...currentRows, ...previousRows].map((entry) => entry.day)).size;
-    const enoughData = dataDays >= 7 && currentRows.length > 0 && previousRows.length > 0;
-    const label = habit.kind === 'done'
-      ? null
-      : classifyTrend(rawChange, 10, enoughData);
-    const completion = currentHabitDays.length
-      ? Math.round((currentValues.filter((value) => value > 0).length / currentHabitDays.length) * 100)
-      : 0;
-    let currentStreak = 0;
-    const streakDays = daysEndingAt(actualToday, Math.max(365, rows.length + 30));
-    for (let index = streakDays.length - 1; index >= 0; index--) {
-      const streakDay = streakDays[index];
-      if (valueFor(byDay.get(streakDay), habit) > 0) currentStreak++;
-      else if (streakDay !== actualToday) break;
-    }
-    const roundedChange = rawChange == null ? null : Math.round(rawChange);
-    const insight = label === null
-      ? `${habit.name} was completed on ${completion}% of the last 30 days.`
-      : label === 'Not enough data'
-        ? 'At least seven logged days across both periods are required for a trend.'
-        : `${habit.name} daily average ${roundedChange! >= 0 ? 'up' : 'down'} ${Math.abs(roundedChange!)}% over the last 30 days.`;
-
-    return {
-      habit,
-      currentAverage,
-      completion,
-      currentStreak,
-      change: roundedChange,
-      label,
-      insight,
-    };
-  });
 
   const weightRows = privateBodyMetrics.filter((metric) => metric.weight_kg != null);
   const smoothedWeight = movingAverage(weightRows, (metric) => metric.weight_kg!, 7);
@@ -442,48 +393,7 @@ export default async function Progress({
           </section>
 
           <div className="section-heading">
-            <div><p className="eyebrow">30-day trend layer</p><h2>Body and activities</h2></div>
-            <span className="privacy-pill">Only you</span>
-          </div>
-
-          <div className="trend-layer-grid">
-            <article className="insight-card trend-layer-card">
-              <div className="between insight-title">
-                <div><p className="eyebrow">Body</p><h3>Weight</h3></div>
-                <span className="trend-mark" data-direction={trendDirection(weightTrendLabel)}>{weightTrendLabel}</span>
-              </div>
-              <div className="metric-row two">
-                <div><span>7-day average</span><strong className="num">{currentWeightAverage ? `${currentWeightAverage.toFixed(1)} kg` : '—'}</strong></div>
-                <div><span>vs prior 30 days</span><strong className="num">{roundedWeightChange == null ? 'Not enough data' : `${roundedWeightChange > 0 ? '+' : ''}${roundedWeightChange}%`}</strong></div>
-              </div>
-              <p className="auto-insight">{weightInsight}</p>
-              <p className="metric-explainer">Trend uses a 7-day moving average. Daily weight values are not shown.</p>
-            </article>
-
-            {habitTrendProgress.map((item) => (
-              <article className="insight-card trend-layer-card" key={item.habit.id}>
-                <div className="between insight-title">
-                  <div><p className="eyebrow">Activity</p><h3>{item.habit.name}</h3></div>
-                  {item.label && <span className="trend-mark" data-direction={trendDirection(item.label)}>{item.label}</span>}
-                </div>
-                {item.habit.kind === 'done' ? (
-                  <div className="metric-row two">
-                    <div><span>30-day completion</span><strong className="num">{item.completion}%</strong></div>
-                    <div><span>Current streak</span><strong className="num">{plural(item.currentStreak, 'day')}</strong></div>
-                  </div>
-                ) : (
-                  <div className="metric-row two">
-                    <div><span>Daily average</span><strong className="num">{formatAverageValue(item.currentAverage, item.habit)}</strong></div>
-                    <div><span>vs prior 30 days</span><strong className="num">{item.change == null ? 'Not enough data' : signedPercent(item.change)}</strong></div>
-                  </div>
-                )}
-                <p className="auto-insight">{item.insight}</p>
-              </article>
-            ))}
-          </div>
-
-          <div className="section-heading">
-            <div><p className="eyebrow">Activities</p><h2>Exact results</h2></div>
+            <div><p className="eyebrow">Personal results</p><h2>Body and activities</h2></div>
             <span className="privacy-pill">Only you</span>
           </div>
 
@@ -496,6 +406,18 @@ export default async function Progress({
           </nav>
 
           <div className="challenge-insights">
+              <article className="insight-card trend-layer-card">
+                <div className="between insight-title">
+                  <div><p className="eyebrow">Body · 30-day trend</p><h3>Weight</h3></div>
+                  <span className="trend-mark" data-direction={trendDirection(weightTrendLabel)}>{weightTrendLabel}</span>
+                </div>
+                <div className="metric-row two">
+                  <div><span>7-day average</span><strong className="num">{currentWeightAverage ? `${currentWeightAverage.toFixed(1)} kg` : '—'}</strong></div>
+                  <div><span>vs prior 30 days</span><strong className="num">{roundedWeightChange == null ? 'Not enough data' : `${roundedWeightChange > 0 ? '+' : ''}${roundedWeightChange}%`}</strong></div>
+                </div>
+                <p className="auto-insight">{weightInsight}</p>
+                <p className="metric-explainer">Trend uses a 7-day moving average. Daily weight values are not shown.</p>
+              </article>
             {visibleChallenges.map((item) => (
               <article className="insight-card" key={item.challenge.id}>
                 <div className="between insight-title">

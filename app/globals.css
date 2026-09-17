@@ -570,7 +570,6 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
   white-space: nowrap;
 }
 .training-insights { display: grid; gap: 12px; }
-.trend-layer-grid { display: grid; gap: 12px; }
 .trend-layer-card .auto-insight { margin-top: 14px; }
 .compact-insight .big-metric { display: block; margin-top: 8px; color: var(--water); font-size: 30px; }
 .group-trend-card { margin-bottom: 24px; }
@@ -637,7 +636,6 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
   .challenge-insights, .training-insights, .pulse-list, .member-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .trend-layer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .group-trend-card { padding: 20px; }
   .exercise-progress-grid, .ranking-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -656,7 +654,7 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 /* Barra inferior -------------------------------------------- */
 .tabs {
   position: fixed; bottom: 0; left: 0; right: 0;
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: grid; grid-template-columns: repeat(5, 1fr);
   background: #08222A;
   border-top: 1px solid var(--line);
   padding: 8px 0 max(8px, env(safe-area-inset-bottom));
@@ -670,6 +668,46 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 }
 .tab[data-active='true'] { color: var(--water); }
 .tab span { display: block; font-size: 17px; margin-bottom: 3px; }
+
+/* Diario de nutrición --------------------------------------- */
+.nutrition-page { max-width: 760px; }
+.nutrition-page > h1 { margin: 8px 0 7px; font-size: clamp(34px, 9vw, 48px); }
+.nutrition-intro { line-height: 1.55; }
+.nutrition-day-picker { display: grid; grid-template-columns: 44px 1fr 44px; align-items: end; gap: 10px; margin-top: 24px; }
+.nutrition-day-picker button { height: 46px; padding: 0; font-size: 20px; }
+.nutrition-day-picker label { margin: 0; }
+.nutrition-day-picker input { margin-top: 6px; }
+.nutrition-date-label { margin-top: 10px; color: var(--water); font: 11px var(--data); text-align: center; }
+.nutrition-overview { display: grid; gap: 12px; margin-top: 22px; }
+.nutrition-overview .card { min-width: 0; }
+.nutrition-big-number { display: block; margin-top: 10px; color: var(--water); font-size: 35px; }
+.nutrition-big-number small { color: var(--mist); font-size: 18px; }
+.nutrition-group-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.nutrition-group-list span { padding: 6px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--mist); font: 9px var(--data); }
+.nutrition-group-list span[data-logged='true'] { border-color: var(--water); color: var(--water); }
+.nutrition-week-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; margin-top: 22px; }
+.nutrition-week-days div { min-width: 0; padding: 10px 2px; border: 1px solid var(--line); border-radius: 8px; text-align: center; }
+.nutrition-week-days strong, .nutrition-week-days span { display: block; }
+.nutrition-week-days strong { color: var(--water); font-size: 15px; }
+.nutrition-week-days span { margin-top: 6px; color: var(--mist); font: 8px var(--data); text-transform: uppercase; }
+.nutrition-idea { margin-top: 14px; }
+.nutrition-idea h2 { margin-top: 12px; font-size: 20px; }
+.nutrition-idea .muted { margin-top: 8px; line-height: 1.5; }
+.nutrition-idea-actions, .nutrition-form-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 16px; }
+.nutrition-idea-actions button, .nutrition-form-actions button { flex: 1 1 130px; }
+.nutrition-meal-list { display: grid; gap: 10px; }
+.nutrition-meal h3 { margin-top: 6px; font-size: 17px; }
+.nutrition-meal > .muted { margin-top: 8px; line-height: 1.5; }
+.nutrition-meal-actions { display: flex; gap: 16px; margin-top: 15px; }
+.nutrition-meal-actions button { padding: 0; background: none; color: var(--water); font: 10px var(--data); text-transform: uppercase; }
+.nutrition-meal-actions button:last-child { color: var(--rope); }
+.nutrition-form-section { margin-bottom: 20px; }
+.nutrition-form-section form > label:not(:first-child), .nutrition-field-label { margin-top: 17px; }
+.nutrition-field-label { margin-bottom: 8px; color: var(--mist); font: 11px var(--data); letter-spacing: .14em; text-transform: uppercase; }
+.nutrition-group-picker { display: flex; flex-wrap: wrap; gap: 7px; }
+.nutrition-group-picker button { padding: 8px 10px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--mist); font: 10px var(--data); }
+.nutrition-group-picker button[aria-pressed='true'] { border-color: var(--water); background: color-mix(in srgb, var(--water) 14%, transparent); color: var(--water); }
+@media (min-width: 620px) { .nutrition-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* Profile and account settings -------------------------------- */
 .settings-section { margin-top: 22px; }
