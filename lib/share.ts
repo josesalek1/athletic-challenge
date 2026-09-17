@@ -4,11 +4,10 @@ import { mmss } from './format';
 
 // Único lugar donde se compone el mensaje para el grupo.
 export function dayLine(
-  dayNumber: number,
+  dateLabel: string,
   results: { challenge: Challenge; payload: Payload }[]
 ) {
   const parts = results
-    .filter(({ challenge }) => challenge.visibility === 'group')
     .map(({ challenge, payload }) => {
       if (challenge.kind === 'timed' && payload.seconds) {
         return `${challenge.name} ${mmss(payload.seconds)}`;
@@ -41,7 +40,7 @@ export function dayLine(
     });
 
   const body = parts.filter(Boolean).join(' | ');
-  return body ? `Day ${dayNumber} ✅ ${body}` : `Day ${dayNumber} — nothing logged`;
+  return body ? `${dateLabel} ✅ ${body}` : `${dateLabel} — nothing logged`;
 }
 
 export function waLink(text: string) {

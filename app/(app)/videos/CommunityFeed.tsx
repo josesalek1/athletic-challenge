@@ -65,11 +65,9 @@ function friendlyLibraryError(error: unknown, action: LibraryAction) {
 
 export default function CommunityFeed({
   currentUserId,
-  isAdmin,
   initialPosts,
 }: {
   currentUserId: string;
-  isAdmin: boolean;
   initialPosts: FeedPost[];
 }) {
   const supabase = createClient();
@@ -156,7 +154,7 @@ export default function CommunityFeed({
               <label htmlFor="feed-description">Description</label>
               <small className="num">{draft.description.length}/500</small>
             </div>
-            <textarea id="feed-description" rows={3} maxLength={500} placeholder="What should members focus on?" value={draft.description} onChange={(event) => setDraft((value) => ({ ...value, description: event.target.value }))} />
+            <textarea id="feed-description" rows={3} maxLength={500} placeholder="A useful technique note" value={draft.description} onChange={(event) => setDraft((value) => ({ ...value, description: event.target.value }))} />
           </div>
         </div>
         <button type="submit" className="btn-water feed-submit" disabled={busy}>
@@ -179,7 +177,7 @@ export default function CommunityFeed({
               {source
                 ? <div className="feed-video"><iframe src={source} title={post.title} allow="accelerometer; encrypted-media; picture-in-picture; fullscreen" allowFullScreen /></div>
                 : <p className="muted">This video uses an unsupported link.</p>}
-              {(post.created_by === currentUserId || isAdmin) && (
+              {post.created_by === currentUserId && (
                 <footer className="feed-post-actions">
                   <button type="button" className="btn-ghost" disabled={busy} onClick={() => deletePost(post)}>Delete video</button>
                 </footer>

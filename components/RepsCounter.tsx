@@ -15,7 +15,7 @@ export default function RepsCounter({
   onSave: (reps: number) => Promise<void>;
   footer?: ReactNode;
 }) {
-  const target = challenge.config.target ?? (challenge.visibility === 'private' ? 0 : 25);
+  const target = challenge.config.target ?? 0;
   const [reps, setReps] = useState(initialReps);
   const [saved, setSaved] = useState(initialReps);
   const [saving, setSaving] = useState(false);

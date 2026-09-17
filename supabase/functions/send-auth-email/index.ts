@@ -40,13 +40,13 @@ function escapeHtml(value: string) {
 
 function subjectFor(action: EmailAction) {
   if (action === 'recovery') return 'Recover your Athletic Challenge access'
-  if (action === 'invite' || action === 'signup') return "You're invited to Athletic Challenge"
+  if (action === 'invite' || action === 'signup') return 'Your Athletic Challenge access link'
   return 'Your Athletic Challenge access link'
 }
 
 function copyFor(action: EmailAction) {
   if (action === 'recovery') return 'Tap the button to recover your access.'
-  if (action === 'invite' || action === 'signup') return 'You have been invited by the group administrator. No registration or password is required.'
+  if (action === 'invite' || action === 'signup') return 'Tap the button to sign in. No password is required.'
   return 'Tap the button to sign in. No password is required.'
 }
 

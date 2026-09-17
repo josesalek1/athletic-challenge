@@ -8,9 +8,7 @@ export type ChecklistItem = {
 
 export type Challenge = {
   id: string;
-  campaign_id: string | null;
-  owner_id: string | null;
-  visibility: 'group' | 'private';
+  owner_id: string;
   name: string;
   kind: 'timed' | 'reps' | 'checklist' | 'done';
   category:
@@ -40,18 +38,6 @@ export type Challenge = {
   };
   active: boolean;
   sort_order: number;
-};
-
-export type Campaign = {
-  id: string;
-  name: string;
-  description: string;
-  starts_on: string;
-  ends_on: string;
-  duration_days: number;
-  active: boolean;
-  created_at?: string;
-  updated_at?: string;
 };
 
 export type Payload = { seconds?: number; reps?: number; done?: string[]; ok?: boolean };

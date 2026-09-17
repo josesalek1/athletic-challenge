@@ -102,7 +102,6 @@ export default function HabitForm({
             category: 'traditional',
             started_on: today(),
             owner_id: userId,
-            visibility: 'private',
           });
 
     setBusy(false);
@@ -117,9 +116,9 @@ export default function HabitForm({
 
   return (
     <main className="wrap habit-form-page">
-      <p className="eyebrow">Private · only you</p>
+      <p className="eyebrow">Personal activity</p>
       <h1 className="display habit-form-title">{editing ? 'Edit habit' : 'New habit'}</h1>
-      <p className="muted habit-form-intro">Private habits never appear in the group report or leaderboard.</p>
+      <p className="muted habit-form-intro">Set a daily activity and track your own progress.</p>
 
       <form className="card habit-form" onSubmit={(event) => { event.preventDefault(); void saveHabit(); }}>
         <div>

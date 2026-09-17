@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { clearOfflineData, flushOfflineQueue, pendingMutationCount } from '@/lib/offline';
 
@@ -11,13 +10,11 @@ export default function ProfileSettings({
   userId,
   initialName,
   initialEmail,
-  role,
   joinedAt,
 }: {
   userId: string;
   initialName: string;
   initialEmail: string;
-  role: 'admin' | 'member';
   joinedAt: string;
 }) {
   const supabase = createClient();
@@ -173,32 +170,9 @@ export default function ProfileSettings({
       </section>
 
       <section className="settings-section">
-        <p className="eyebrow">Membership</p>
-        <div className="card">
-          <div className="between">
-            <div>
-              <p style={{ fontWeight: 600 }}>Athletic Challenge</p>
-              <p className="muted" style={{ marginTop: 3 }}>Joined {joined}</p>
-            </div>
-            <span className="membership-badge">{role}</span>
-          </div>
-        </div>
+        <p className="eyebrow">Account</p>
+        <div className="card"><p className="muted">Created {joined}</p></div>
       </section>
-
-      {role === 'admin' && (
-        <section className="settings-section">
-          <p className="eyebrow">Administration</p>
-          <div className="card admin-entry-card">
-            <div>
-              <p style={{ fontWeight: 600 }}>Manage Athletic Challenge</p>
-              <p className="muted" style={{ marginTop: 4 }}>
-                Members, campaigns, activities and videos.
-              </p>
-            </div>
-            <Link className="btn btn-water" href="/admin">Open admin panel</Link>
-          </div>
-        </section>
-      )}
 
       <section className="settings-section">
         <p className="eyebrow">Sessions</p>

@@ -1,49 +1,28 @@
 # Athletic Challenge
 
-Aplicación web instalable para un grupo privado que registra retos diarios,
-entrenamiento, natación, hábitos y métricas corporales. Está construida con
-Next.js 15, TypeScript, Supabase y Vercel.
+Personal athletic tracker built with Next.js 15, TypeScript, Supabase and Vercel. The interface is in English.
 
-## Funciones actuales
+## Features
 
-- Acceso sin contraseña mediante invitación y magic link.
-- Campaña grupal con fecha oficial de inicio y fin; el inicio siempre es
-  `Day 1` para todos.
-- Actividades configurables por datos: `timed`, `reps`, `checklist` y
-  `done`.
-- Resultados exactos privados. El grupo solo recibe el booleano de objetivo
-  cumplido almacenado en `group_checkins`.
-- Hábitos privados creados por cada miembro.
-- Progress con periodos de 7, 14, 30, 60 y 90 días, tendencias de hábitos,
-  fuerza, natación y peso.
-- Plan personal de entrenamiento, registro de series, sesiones y natación.
-- Métricas corporales privadas.
-- Biblioteca de técnica con enlaces permitidos de YouTube, Vimeo y Google
-  Drive.
-- Panel de administración para miembros, campañas, actividades, vídeos,
-  invitaciones, fechas oficiales y reinicios.
-- Cola offline en IndexedDB para resultados, series, sesiones y natación.
-  Algunas pantallas y operaciones todavía requieren conexión.
+- Magic link sign in for the existing owner account.
+- Daily activities stored as Supabase rows. `kind` selects the timed, reps, checklist or done interface.
+- Personal progress over 7, 14, 30, 60 or 90 days, with trends for activities, strength, swimming and weight.
+- Training plan, workout sets, swimming sessions and body measurements.
+- Technique library with YouTube, Vimeo and Google Drive links.
+- A WhatsApp report composed in the browser and sent manually by the owner.
+- IndexedDB queue for offline results and training logs. Some screens still require a connection.
 
-## Privacidad y autorización
+## Database and authorization
 
-La autorización vive en Postgres:
+Existing databases at v16 need only `migration-v17.sql`. For a new database, apply `supabase/schema.sql` and migrations v2 through v16, create the owner Auth account using the allow-list flow, then apply v17.
 
-- RLS limita `entries`, `training_sets`, `training_sessions`,
-  `swim_sessions` y `body_metrics` a su propietario.
-- Los clientes no necesitan filtrar esas tablas por `user_id`; una consulta
-  ajena obtiene cero filas.
-- `group_checkins` contiene únicamente el estado compartido del objetivo.
-- Los hábitos con `visibility = 'private'` no generan check-ins ni aparecen
-  en el mensaje de WhatsApp.
-- Los GRANT por columna impiden modificar campos sensibles de los retos desde
-  un cliente manipulado.
-- Las acciones administrativas usan funciones `security definer` que
-  comprueban `is_admin()`.
+Before running v17, replace `CHANGE_OWNER_EMAIL` on line 10 with the exact email of the existing owner account. **Review this migration carefully:** it deletes every other Auth account and its personal data through foreign key cascades. It assigns the existing shared challenges and video library to the owner, removes campaigns, roles, memberships and shared check-ins, and rejects new account creation. It does not run automatically from this repository.
 
-## Preparación local
+Postgres RLS limits profiles, challenges, entries, videos, training, swimming and body metrics to the signed in owner. The frontend does not grant access. The offline sync function checks both `auth.uid()` and challenge ownership.
 
-Requisitos: Node.js compatible con Next.js 15 y un proyecto de Supabase.
+Magic link sign in continues to use the existing account. Keep Supabase Email Auth, the production URL and `/auth/callback` redirect configured. The email hook can remain deployed.
+
+## Local setup
 
 ```bash
 npm install
@@ -51,70 +30,24 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Variables públicas:
+Required public environment variables:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `NEXT_PUBLIC_SITE_URL`
-- `NEXT_PUBLIC_WHATSAPP_GROUP` (opcional)
 
-La integración de correo y la función de asistencia con Claude usan secretos
-configurados en Supabase, nunca variables públicas del navegador.
-
-## Base de datos
-
-En un proyecto nuevo, ejecuta en orden:
-
-1. `supabase/schema.sql`
-2. `supabase/migration-v2.sql` hasta `supabase/migration-v16.sql`
-
-Las migraciones se aplican manualmente en el SQL Editor de Supabase. No edites
-una migración que ya fue ejecutada; crea la siguiente versión.
-
-`migration-v16.sql`:
-
-- valida en el servidor las confirmaciones de Campaign control;
-- evita que una cola offline anterior vuelva a crear actividad reiniciada;
-- corrige los permisos por columna de `challenges`;
-- restringe nuevos vídeos a YouTube, Vimeo y Google Drive.
-
-Después de ejecutar las migraciones, configura en Supabase:
-
-- Authentication con Email y magic links.
-- La URL de producción y `/auth/callback` entre las redirect URLs.
-- El hook de correo transaccional y sus secretos.
-- Los secretos de la función que interpreta actividades con Claude.
-
-## Rutas
-
-La navegación principal tiene cuatro pestañas:
+## Routes
 
 - `/hoy` — Today
 - `/semana` — Progress
 - `/training` — Training
-- `/settings` — More
+- `/videos` — Technique library
+- `/settings` — Account settings
+- `/login` and `/auth/callback` — Sign in
 
-Rutas adicionales:
-
-- `/videos` — biblioteca de técnica, enlazada desde Training
-- `/admin` — administración, solo para administradores
-- `/login` y `/auth/callback` — acceso
-- `/offline` — estado sin conexión
-
-## Verificación antes de un commit
+## Before committing
 
 ```bash
 npx tsc --noEmit
 npm run build
 ```
-
-Ambos comandos deben terminar sin errores. El build debe seguir generando
-`/videos`, aunque esa ruta no aparezca en la barra principal.
-
-## Límites conocidos
-
-- No hay notificaciones push automáticas.
-- No hay chat, comentarios ni reacciones.
-- El modo offline es parcial y no cubre todas las operaciones.
-- No existe una aplicación nativa en App Store o Google Play; es una PWA.
-- La sesión debe verificarse una vez en cada dispositivo o navegador nuevo.

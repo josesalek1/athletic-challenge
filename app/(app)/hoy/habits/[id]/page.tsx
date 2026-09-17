@@ -13,7 +13,7 @@ export default async function EditHabit({ params }: { params: Promise<{ id: stri
     .from('challenges')
     .select('*')
     .eq('id', id)
-    .eq('visibility', 'private')
+    .eq('owner_id', user!.id)
     .single();
 
   if (!habit) notFound();

@@ -8,7 +8,7 @@ export default async function SettingsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase
     .from('profiles')
-    .select('display_name, role, active, created_at')
+    .select('display_name, created_at')
     .eq('id', user!.id)
     .single();
 
@@ -17,9 +17,7 @@ export default async function SettingsPage() {
       userId={user!.id}
       initialName={profile?.display_name ?? ''}
       initialEmail={user?.email ?? ''}
-      role={profile?.role === 'admin' ? 'admin' : 'member'}
       joinedAt={profile?.created_at ?? user?.created_at ?? ''}
     />
   );
 }
-

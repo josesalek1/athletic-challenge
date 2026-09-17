@@ -11,10 +11,7 @@ export default function Login() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('error') === 'account_disabled') {
-      setState('error');
-      setMessage('This account is inactive. Contact the group administrator.');
-    } else if (params.get('error') === 'link_expired') {
+    if (params.get('error') === 'link_expired') {
       setState('error');
       setMessage('This access link expired or was already used. Request a fresh one below.');
     }
@@ -33,7 +30,7 @@ export default function Login() {
 
     if (error) {
       setState('error');
-      setMessage('No invited account was found for this email, or the link could not be sent. Ask the group administrator for an invitation.');
+      setMessage('The access link could not be sent. Check your email address and try again.');
       return;
     }
     setState('sent');
@@ -46,7 +43,7 @@ export default function Login() {
         Athletic Challenge
       </h1>
       <p className="muted" style={{ marginBottom: 30 }}>
-        Invited members sign in with one email link — no registration or password required.
+        Sign in to your personal tracker with an email link.
       </p>
 
       {state === 'sent' ? (
@@ -61,7 +58,7 @@ export default function Login() {
       ) : (
         <div className="card">
           <p style={{ fontWeight: 600, marginBottom: 5 }}>Open Athletic Challenge</p>
-          <p className="muted" style={{ marginBottom: 16 }}>Use the email address your administrator invited.</p>
+          <p className="muted" style={{ marginBottom: 16 }}>Use your Athletic Challenge email address.</p>
           <label htmlFor="email">Your email</label>
           <input
             id="email"
@@ -85,9 +82,6 @@ export default function Login() {
           {state === 'error' && (
             <p className="muted" style={{ marginTop: 12, color: 'var(--rope)' }}>{message}</p>
           )}
-          <p className="muted" style={{ marginTop: 14, textAlign: 'center' }}>
-            Not invited yet? Ask the Athletic Challenge administrator.
-          </p>
         </div>
       )}
     </main>

@@ -1,7 +1,7 @@
 {
   "name": "Athletic Challenge",
   "short_name": "Athletic Challenge",
-  "description": "Your group’s daily athletic challenge",
+  "description": "Your personal athletic challenge",
   "id": "/",
   "start_url": "/hoy",
   "scope": "/",

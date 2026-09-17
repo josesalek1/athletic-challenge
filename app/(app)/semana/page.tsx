@@ -5,21 +5,12 @@ import { daysEndingAt, mmss, today } from '@/lib/format';
 import { validChecklistDone } from '@/lib/checklist';
 import { PLAN } from '@/lib/plan';
 import { classifyTrend, hasThreeConsecutiveDeclines, movingAverage, percentChange as precisePercentChange, trendDirection } from '@/lib/trends';
-import type { BodyMetric, Campaign, Challenge, Entry } from '@/lib/types';
+import type { BodyMetric, Challenge, Entry } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
 const RANGES = [7, 14, 30, 60, 90] as const;
 type Range = (typeof RANGES)[number];
-type View = 'me' | 'group';
-
-type GroupCheckin = {
-  user_id: string;
-  challenge_id: string;
-  day: string;
-  goal_met: boolean;
-};
-
 type TrainingSession = {
   day: string;
   slot: string;
@@ -109,106 +100,50 @@ function plural(value: number, singular: string, pluralForm = `${singular}s`) {
 export default async function Progress({
   searchParams,
 }: {
-  searchParams: Promise<{ days?: string; view?: string; challenge?: string; campaign?: string }>;
+  searchParams: Promise<{ days?: string; challenge?: string }>;
 }) {
   const params = await searchParams;
   const requested = Number(params.days);
   const range: Range = RANGES.includes(requested as Range) ? requested as Range : 7;
-  const view: View = params.view === 'group' ? 'group' : 'me';
   const actualToday = today();
   const supabase = await createClient();
-  await supabase.auth.getUser();
   const trendDays = daysEndingAt(actualToday, 30);
   const trendPreviousAnchorDate = new Date(`${trendDays[0]}T12:00:00`);
   trendPreviousAnchorDate.setDate(trendPreviousAnchorDate.getDate() - 1);
   const trendPreviousDays = daysEndingAt(trendPreviousAnchorDate.toISOString().slice(0, 10), 30);
   const trendStart = trendPreviousDays[0];
-
-  const { data: campaignRows } = await supabase
-    .from('campaigns')
-    .select('*')
-    .order('starts_on', { ascending: false });
-  const campaigns = (campaignRows ?? []) as Campaign[];
-  const campaign = campaigns.find((item) => item.id === params.campaign)
-    ?? campaigns.find((item) => item.active)
-    ?? campaigns[0];
-  const anchorDay = campaign
-    ? actualToday < campaign.starts_on
-      ? campaign.starts_on
-      : actualToday > campaign.ends_on ? campaign.ends_on : actualToday
-    : actualToday;
-  const campaignDays = campaign
-    ? daysEndingAt(campaign.ends_on, campaign.duration_days).filter((day) => day <= anchorDay)
-    : daysEndingAt(anchorDay, 180);
-  const days = daysEndingAt(anchorDay, range)
-    .filter((day) => !campaign || (day >= campaign.starts_on && day <= campaign.ends_on));
-  const previousAnchorDate = new Date(`${days[0] ?? anchorDay}T12:00:00`);
+  const days = daysEndingAt(actualToday, range);
+  const previousAnchorDate = new Date(`${days[0]}T12:00:00`);
   previousAnchorDate.setDate(previousAnchorDate.getDate() - 1);
-  const previousAnchor = previousAnchorDate.toISOString().slice(0, 10);
-  const previousDays = daysEndingAt(previousAnchor, range)
-    .filter((day) => !campaign || day >= campaign.starts_on);
-  const allDays = campaignDays.length ? campaignDays : [anchorDay];
-  const historyStart = [allDays[0], trendStart].sort()[0];
-  const currentDay = anchorDay;
-  const axisEndLabel = currentDay === actualToday ? 'Today' : shortDate(currentDay);
+  const previousDays = daysEndingAt(previousAnchorDate.toISOString().slice(0, 10), range);
+  const allDays = daysEndingAt(actualToday, 3650);
+  const currentDay = actualToday;
+  const axisEndLabel = 'Today';
 
   const [
-    { data: profiles },
-    { data: checkins },
     { data: challenges },
-    { data: habits },
     { data: entries },
     { data: trainingSessions },
     { data: trainingSets },
     { data: swimSessions },
     { data: bodyMetrics },
   ] = await Promise.all([
-    supabase.from('profiles').select('id, display_name').eq('active', true).order('display_name'),
-    supabase.from('group_checkins').select('user_id, challenge_id, day, goal_met')
-      .gte('day', allDays[0]),
-    campaign
-      ? supabase.from('challenges').select('*').eq('campaign_id', campaign.id).eq('visibility', 'group').order('sort_order')
-      : Promise.resolve({ data: [] }),
-    supabase.from('challenges').select('*').eq('visibility', 'private').eq('active', true).order('sort_order'),
+    supabase.from('challenges').select('*').eq('active', true).order('sort_order'),
     supabase.from('entries').select('user_id, challenge_id, day, payload'),
-    supabase.from('training_sessions').select('day, slot, done, distance_m')
-      .gte('day', historyStart),
+    supabase.from('training_sessions').select('day, slot, done, distance_m').gte('day', trendStart),
     supabase.from('training_sets').select('day, exercise_key, weight_kg, reps, seconds'),
     supabase.from('swim_sessions').select('day, distance_m, duration_s, stroke, rpe, notes'),
     supabase.from('body_metrics').select('user_id, day, weight_kg, waist_cm, note').gte('day', trendStart),
   ]);
-
   const active = (challenges ?? []) as Challenge[];
-  const privateHabits = (habits ?? []) as Challenge[];
+  const privateHabits = active;
   const privateBodyMetrics = (bodyMetrics ?? []) as BodyMetric[];
-  const activityIds = new Set(active.map((challenge) => challenge.id));
   const privateEntries = (entries ?? []) as Entry[];
-  const shared = ((checkins ?? []) as GroupCheckin[])
-    .filter((checkin) => activityIds.has(checkin.challenge_id));
   const periodEntries = privateEntries.filter((entry) => days.includes(entry.day));
   const previousEntries = privateEntries.filter((entry) => previousDays.includes(entry.day));
-  const periodCheckins = shared.filter((checkin) => days.includes(checkin.day));
-  const byPrivateKey = new Map(periodEntries.map((entry) => [
-    `${entry.day}|${entry.challenge_id}`,
-    entry,
-  ]));
-  const byPreviousKey = new Map(previousEntries.map((entry) => [
-    `${entry.day}|${entry.challenge_id}`,
-    entry,
-  ]));
-  const byAllPrivateKey = new Map(privateEntries.map((entry) => [
-    `${entry.day}|${entry.challenge_id}`,
-    entry,
-  ]));
-  const bySharedKey = new Map(shared.map((checkin) => [
-    `${checkin.user_id}|${checkin.day}|${checkin.challenge_id}`,
-    checkin,
-  ]));
-
-  function availableChallenges(day: string) {
-    if (campaign && (day < campaign.starts_on || day > campaign.ends_on)) return [];
-    return active.filter((challenge) => !challenge.started_on || challenge.started_on <= day);
-  }
+  const byPrivateKey = new Map(periodEntries.map((entry) => [`${entry.day}|${entry.challenge_id}`, entry]));
+  const byPreviousKey = new Map(previousEntries.map((entry) => [`${entry.day}|${entry.challenge_id}`, entry]));
+  const byAllPrivateKey = new Map(privateEntries.map((entry) => [`${entry.day}|${entry.challenge_id}`, entry]));
 
   const challengeProgress = active.map((challenge) => {
     const target = targetFor(challenge);
@@ -485,170 +420,21 @@ export default async function Progress({
     ? 'At least seven timed swim sessions across both periods are required for a trend.'
     : `Average swim pace ${roundedSwimRawChange! >= 0 ? 'up' : 'down'} ${Math.abs(roundedSwimRawChange!)}% over the last 30 days.`;
 
-  function groupDayProgress(userId: string, day: string) {
-    const available = availableChallenges(day);
-    if (!available.length) return { met: 0, total: 0, percent: 0, checked: 0 };
-    const checkinsForDay = available
-      .map((challenge) => bySharedKey.get(`${userId}|${day}|${challenge.id}`))
-      .filter(Boolean) as GroupCheckin[];
-    const met = checkinsForDay.filter((checkin) => checkin.goal_met).length;
-    return {
-      met,
-      total: available.length,
-      checked: checkinsForDay.length,
-      percent: Math.round((met / available.length) * 100),
-    };
-  }
-
-  function streak(userId: string) {
-    let count = 0;
-    for (let index = allDays.length - 1; index >= 0; index--) {
-      const day = allDays[index];
-      const hasCheckin = shared.some((checkin) => checkin.user_id === userId && checkin.day === day);
-      if (hasCheckin) count++;
-      else if (day !== actualToday) break;
-    }
-    return count;
-  }
-
-  const memberStats = (profiles ?? []).map((profile) => {
-    const timeline = days.map((day) => groupDayProgress(profile.id, day));
-    const met = timeline.reduce((sum, item) => sum + item.met, 0);
-    const possible = timeline.reduce((sum, item) => sum + item.total, 0);
-    const activeDays = timeline.filter((item) => item.checked > 0).length;
-    const previousRows = shared.filter((checkin) => checkin.user_id === profile.id && previousDays.includes(checkin.day));
-    const previousRate = previousRows.length
-      ? Math.round((previousRows.filter((row) => row.goal_met).length / previousRows.length) * 100)
-      : 0;
-    const currentRate = periodCheckins.filter((checkin) => checkin.user_id === profile.id);
-    const goalRate = currentRate.length
-      ? Math.round((currentRate.filter((row) => row.goal_met).length / currentRate.length) * 100)
-      : 0;
-    return {
-      ...profile,
-      met,
-      possible,
-      activeDays,
-      percent: possible ? Math.round((met / possible) * 100) : 0,
-      streak: streak(profile.id),
-      goalRate,
-      improvement: previousRows.length ? goalRate - previousRate : null,
-      yogicGoalDays: periodCheckins.filter((checkin) => checkin.user_id === profile.id && checkin.challenge_id === 'yogic' && checkin.goal_met).length,
-    };
-  });
-
-  const consistencyLeader = [...memberStats].sort((a, b) => b.activeDays - a.activeDays || b.streak - a.streak)[0];
-  const streakLeader = [...memberStats].sort((a, b) => b.streak - a.streak)[0];
-  const improvementLeader = [...memberStats].filter((member) => member.improvement != null)
-    .sort((a, b) => (b.improvement ?? 0) - (a.improvement ?? 0))[0];
-  const yogicLeader = [...memberStats].sort((a, b) => b.yogicGoalDays - a.yogicGoalDays)[0];
-
-  const groupTimeline = days.map((day) => {
-    const activeMembers = new Set(periodCheckins.filter((checkin) => checkin.day === day)
-      .map((checkin) => checkin.user_id)).size;
-    return {
-      day,
-      activeMembers,
-      percent: profiles?.length ? Math.round((activeMembers / profiles.length) * 100) : 0,
-    };
-  });
-  const groupGoalRate = periodCheckins.length
-    ? Math.round((periodCheckins.filter((checkin) => checkin.goal_met).length / periodCheckins.length) * 100)
-    : 0;
-  const groupGoalsAchieved = periodCheckins.filter((checkin) => checkin.goal_met).length;
-  const activeMemberDays = groupTimeline.reduce((sum, item) => sum + item.activeMembers, 0);
-  const possibleMemberDays = (profiles?.length ?? 0) * days.length;
-  const groupParticipation = possibleMemberDays
-    ? Math.round((activeMemberDays / possibleMemberDays) * 100)
-    : 0;
-  const challengePulse = active.map((challenge) => {
-    const rows = periodCheckins.filter((checkin) => checkin.challenge_id === challenge.id);
-    const members = new Set(rows.map((row) => row.user_id)).size;
-    const met = rows.filter((row) => row.goal_met).length;
-    return {
-      challenge,
-      members,
-      checkins: rows.length,
-      rate: rows.length ? Math.round((met / rows.length) * 100) : 0,
-    };
-  });
-  const todayActive = new Set(shared.filter((checkin) => checkin.day === currentDay).map((checkin) => checkin.user_id)).size;
-  let collectiveStreak = 0;
-  for (let index = allDays.length - 1; index >= 0; index--) {
-    const day = allDays[index];
-    const activeOnDay = new Set(shared.filter((checkin) => checkin.day === day).map((checkin) => checkin.user_id)).size;
-    if (profiles?.length && activeOnDay === profiles.length) collectiveStreak++;
-    else if (day !== actualToday) break;
-  }
-  const strongestChallenge = [...challengePulse].sort((a, b) => b.rate - a.rate)[0];
-  const needsAttention = [...challengePulse].filter((item) => item.checkins > 0).sort((a, b) => a.rate - b.rate)[0];
-  const celebrations = [
-    profiles?.length && todayActive === profiles.length
-      ? `Everyone checked in ${currentDay === actualToday ? 'today' : `on ${shortDate(currentDay)}`}.`
-      : null,
-    collectiveStreak > 1 ? `The whole group has checked in for ${collectiveStreak} days in a row.` : null,
-    strongestChallenge?.rate === 100 ? `Every ${strongestChallenge.challenge.name} check-in reached the goal.` : null,
-  ].filter(Boolean) as string[];
-
   return (
     <main className="wrap progress-page">
       <p className="eyebrow">Progress and consistency</p>
       <div className="between progress-heading">
-        <h1 className="display">{view === 'me' ? 'My progress' : 'Group pulse'}</h1>
+        <h1 className="display">My progress</h1>
         <span className="range-label num">{range} days</span>
       </div>
-
-      {campaign ? (
-        <section className="progress-campaign-card">
-          <div className="between">
-            <div>
-              <p className="eyebrow">{campaign.active ? 'Active campaign' : 'Campaign history'}</p>
-              <h2>{campaign.name}</h2>
-            </div>
-            <span className="campaign-duration num">{campaign.duration_days} days</span>
-          </div>
-          {campaign.description && <p className="muted">{campaign.description}</p>}
-          <p className="campaign-dates num">{campaign.starts_on} → {campaign.ends_on}</p>
-        </section>
-      ) : (
-        <p className="empty">No campaign is available yet.</p>
-      )}
-
-      {campaigns.length > 1 && (
-        <nav className="campaign-picker" aria-label="Campaign history">
-          {campaigns.map((item) => (
-            <Link key={item.id}
-              href={`/semana?view=${view}&days=${range}&challenge=all&campaign=${item.id}`}
-              data-on={item.id === campaign?.id}>
-              {item.name}<small>{item.active ? 'Active' : `${item.starts_on} · ${item.duration_days} days`}</small>
-            </Link>
-          ))}
-        </nav>
-      )}
-
-      <nav className="view-picker" aria-label="Progress view">
-        <Link href={`/semana?view=me&days=${range}&challenge=${selectedChallenge}&campaign=${campaign?.id ?? ''}`} data-on={view === 'me'}>
-          My progress
-          <small>Private</small>
-        </Link>
-        <Link href={`/semana?view=group&days=${range}&challenge=${selectedChallenge}&campaign=${campaign?.id ?? ''}`} data-on={view === 'group'}>
-          Group pulse
-          <small>Shared</small>
-        </Link>
-      </nav>
-
       <nav className="range-picker" aria-label="Progress period">
         {RANGES.map((value) => (
-          <Link key={value} href={`/semana?view=${view}&days=${value}&challenge=${selectedChallenge}&campaign=${campaign?.id ?? ''}`}
-                className="range-option" data-on={range === value}>
-            {value}
-            <small>days</small>
+          <Link key={value} href={`/semana?days=${value}&challenge=${selectedChallenge}`}
+            className="range-option" data-on={range === value}>
+            {value}<small>days</small>
           </Link>
         ))}
       </nav>
-
-      {view === 'me' ? (
-        <>
           <section className="insight-strip" aria-label="Personal overview">
             <div><strong className="num">{challengeEntryCount}</strong><span>challenge entries<small>one activity on one day</small></span></div>
             <div><strong className="num">{completedTrainingSessions}</strong><span>completed sessions<small>strength or swimming</small></span></div>
@@ -656,7 +442,7 @@ export default async function Progress({
           </section>
 
           <div className="section-heading">
-            <div><p className="eyebrow">30-day trend layer</p><h2>Body and private habits</h2></div>
+            <div><p className="eyebrow">30-day trend layer</p><h2>Body and activities</h2></div>
             <span className="privacy-pill">Only you</span>
           </div>
 
@@ -677,7 +463,7 @@ export default async function Progress({
             {habitTrendProgress.map((item) => (
               <article className="insight-card trend-layer-card" key={item.habit.id}>
                 <div className="between insight-title">
-                  <div><p className="eyebrow">Private habit</p><h3>{item.habit.name}</h3></div>
+                  <div><p className="eyebrow">Activity</p><h3>{item.habit.name}</h3></div>
                   {item.label && <span className="trend-mark" data-direction={trendDirection(item.label)}>{item.label}</span>}
                 </div>
                 {item.habit.kind === 'done' ? (
@@ -697,14 +483,14 @@ export default async function Progress({
           </div>
 
           <div className="section-heading">
-            <div><p className="eyebrow">Campaign activities</p><h2>Exact results</h2></div>
+            <div><p className="eyebrow">Activities</p><h2>Exact results</h2></div>
             <span className="privacy-pill">Only you</span>
           </div>
 
           <nav className="challenge-filter" aria-label="Activity filter">
-            <Link href={`/semana?view=me&days=${range}&challenge=all&campaign=${campaign?.id ?? ''}`} data-on={selectedChallenge === 'all'}>All</Link>
+            <Link href={`/semana?days=${range}&challenge=all`} data-on={selectedChallenge === 'all'}>All</Link>
             {active.map((challenge) => (
-              <Link key={challenge.id} href={`/semana?view=me&days=${range}&challenge=${challenge.id}&campaign=${campaign?.id ?? ''}`}
+              <Link key={challenge.id} href={`/semana?days=${range}&challenge=${challenge.id}`}
                     data-on={selectedChallenge === challenge.id}>{challenge.name}</Link>
             ))}
           </nav>
@@ -812,93 +598,8 @@ export default async function Progress({
           )}
 
           <p className="muted progress-note">
-            Your habits, body measurements, repetitions, times, selected Yogic practices, weights and swim details are private.
+            Your activities, body measurements, repetitions, times, weights and swim details are personal.
           </p>
-        </>
-      ) : (
-        <>
-          {celebrations.length > 0 && (
-            <section className="celebration-stack" aria-label="Group celebrations">
-              {celebrations.map((message) => <p key={message}>✦ {message}</p>)}
-            </section>
-          )}
-          <section className="insight-strip" aria-label="Group overview">
-            <div><strong className="num">{groupParticipation}%</strong><span>daily participation<small>active member-days</small></span></div>
-            <div><strong className="num">{groupGoalRate}%</strong><span>shared goals met<small>{groupGoalsAchieved} of {periodCheckins.length}</small></span></div>
-            <div><strong className="num">{collectiveStreak}</strong><span>full-group streak<small>days in a row</small></span></div>
-          </section>
-
-          <article className="insight-card group-trend-card">
-            <div className="between insight-title">
-              <div><p className="eyebrow">Momentum</p><h2>Active members by day</h2></div>
-              <strong className="num">{todayActive}/{profiles?.length ?? 0}<small> {currentDay === actualToday ? 'today' : 'period end'}</small></strong>
-            </div>
-            <div className="personal-chart group-chart" style={{ gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, minmax(0, 1fr))` }}>
-              {groupTimeline.map((point) => (
-                <i key={point.day} title={`${shortDate(point.day)}: ${point.activeMembers}/${profiles?.length ?? 0} members`}
-                   data-today={point.day === currentDay}
-                   data-empty={point.activeMembers === 0}
-                   style={{ '--bar-height': `${point.activeMembers ? Math.max(point.percent, 10) : 5}%` } as CSSProperties} />
-              ))}
-            </div>
-            <div className="chart-axis num"><span>{shortDate(days[0])}</span><span>{axisEndLabel}</span></div>
-            <p className="metric-explainer">Each bar shows how many active members logged at least one challenge that day.</p>
-          </article>
-
-          <p className="metric-explainer collective-explainer">
-            Full-group streak counts consecutive days when every active member logged at least one activity. {currentDay === actualToday ? 'Today counts only after everyone checks in.' : 'For historical campaigns, the count ends on the campaign period shown.'}
-          </p>
-
-          <div className="section-heading">
-            <div><p className="eyebrow">By activity</p><h2>What is working</h2></div>
-          </div>
-          <div className="pulse-list">
-            {challengePulse.map((item) => (
-              <article className="pulse-row" key={item.challenge.id}>
-                <div className="between">
-                  <div><h3>{item.challenge.name}</h3><p className="muted">{item.members}/{profiles?.length ?? 0} members checked in</p></div>
-                  <strong className="num">{item.rate}%</strong>
-                </div>
-                <div className="rate-track"><i style={{ width: `${item.rate}%` }} /></div>
-                <p className="num pulse-caption">{item.checkins} shared check-ins · goal-met rate</p>
-              </article>
-            ))}
-          </div>
-
-          <div className="section-heading">
-            <div><p className="eyebrow">Members</p><h2>Consistency</h2></div>
-          </div>
-          <div className="member-grid">
-            {memberStats.map((person) => (
-              <article className="member-card" key={person.id}>
-                <div className="between">
-                  <h3>{person.display_name}</h3>
-                  <strong className="num">{person.percent}%</strong>
-                </div>
-                <p className="muted">{person.activeDays}/{days.length} active days · {plural(person.streak, 'day')} streak</p>
-              </article>
-            ))}
-          </div>
-
-          <div className="section-heading"><div><p className="eyebrow">Positive competition</p><h2>Relative rankings</h2></div></div>
-          <div className="ranking-grid">
-            <article><span>Most consistent</span><strong>{consistencyLeader?.display_name ?? '—'}</strong><small>{consistencyLeader ? `${consistencyLeader.activeDays}/${days.length} active days` : 'No activity yet'}</small></article>
-            <article><span>Longest current streak</span><strong>{streakLeader?.display_name ?? '—'}</strong><small>{streakLeader ? plural(streakLeader.streak, 'day') : 'No streak yet'}</small></article>
-            <article><span>Most improved</span><strong>{improvementLeader?.display_name ?? '—'}</strong><small>{improvementLeader?.improvement != null ? `${signedPercent(improvementLeader.improvement)} goal rate` : 'Comparison pending'}</small></article>
-            <article><span>Yogic goal days</span><strong>{yogicLeader?.display_name ?? '—'}</strong><small>{yogicLeader ? plural(yogicLeader.yogicGoalDays, 'day') : 'No result yet'}</small></article>
-          </div>
-
-          {needsAttention && strongestChallenge && (
-            <p className="auto-insight group-insight">
-              {strongestChallenge.challenge.name} has the strongest goal rate at {strongestChallenge.rate}%. {needsAttention.challenge.name} has the most room to grow at {needsAttention.rate}%.
-            </p>
-          )}
-
-          <p className="muted progress-note">
-            Group insights use check-ins and goal completion only. Exact repetitions, times and selections stay private.
-          </p>
-        </>
-      )}
     </main>
   );
 }
