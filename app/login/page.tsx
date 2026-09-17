@@ -39,8 +39,8 @@ export default function Login() {
   }
 
   async function verifyCode() {
-    if (!/^\d{8}$/.test(code)) {
-      setMessage('Enter the eight-digit code from the email.');
+    if (!/^\d{6}$/.test(code)) {
+      setMessage('Enter the six-digit code from the email.');
       return;
     }
     setState('verifying');
@@ -73,17 +73,17 @@ export default function Login() {
         <div className="card">
           <p style={{ fontWeight: 600, marginBottom: 6 }}>Check your inbox</p>
           <p className="muted">
-            Enter the eight-digit code below to sign in to this installed app.
+            Enter the six-digit code below to sign in to this installed app.
             The email link opens the browser and signs in there instead.
           </p>
           <label htmlFor="access-code">Access code</label>
           <input id="access-code" type="text" inputMode="numeric" autoComplete="one-time-code"
-            pattern="[0-9]*" maxLength={8} value={code}
-            onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 8))}
+            pattern="[0-9]*" maxLength={6} value={code}
+            onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
             onKeyDown={(event) => event.key === 'Enter' && void verifyCode()}
-            placeholder="8-digit code" />
+            placeholder="6-digit code" />
           <button className="btn-water" style={{ width: '100%', marginTop: 14 }}
-            disabled={state === 'verifying' || code.length !== 8} onClick={verifyCode}>
+            disabled={state === 'verifying' || code.length !== 6} onClick={verifyCode}>
             {state === 'verifying' ? 'Signing in…' : 'Sign in with code'}
           </button>
           {message && <p className="muted" role="alert" style={{ marginTop: 12, color: 'var(--rope)' }}>{message}</p>}
