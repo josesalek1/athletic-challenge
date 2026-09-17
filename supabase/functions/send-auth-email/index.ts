@@ -13,6 +13,7 @@ type HookPayload = {
     email: string
   }
   email_data: {
+    token: string
     token_hash: string
     redirect_to: string
     email_action_type: EmailAction
@@ -47,6 +48,7 @@ function subjectFor(action: EmailAction) {
 function copyFor(action: EmailAction) {
   if (action === 'recovery') return 'Tap the button to recover your access.'
   if (action === 'invite' || action === 'signup') return 'Tap the button to sign in. No password is required.'
+  if (action === 'magiclink') return 'Open the link to sign in to your browser, or enter the code in the installed app.'
   return 'Tap the button to sign in. No password is required.'
 }
 
@@ -66,13 +68,21 @@ Deno.serve(async (request) => {
 
     const supabaseUrl = requireSecret('SUPABASE_URL')
     const brevoApiKey = requireSecret('BREVO_API_KEY')
-    const verificationUrl = new URL('/auth/v1/verify', supabaseUrl)
-    verificationUrl.searchParams.set('token', emailData.token_hash)
-    verificationUrl.searchParams.set('type', emailData.email_action_type)
-    verificationUrl.searchParams.set('redirect_to', emailData.redirect_to)
+    // El enlace de acceso verifica el hash en la web, sin depender del PKCE
+    // almacenado en el navegador que pidió el correo.
+    const isMagicLink = emailData.email_action_type === 'magiclink'
+    const verificationUrl = isMagicLink
+      ? new URL('/auth/confirm', emailData.redirect_to)
+      : new URL('/auth/v1/verify', supabaseUrl)
+    verificationUrl.searchParams.set(isMagicLink ? 'token_hash' : 'token', emailData.token_hash)
+    if (!isMagicLink) {
+      verificationUrl.searchParams.set('type', emailData.email_action_type)
+      verificationUrl.searchParams.set('redirect_to', emailData.redirect_to)
+    }
 
     const safeUrl = escapeHtml(verificationUrl.toString())
     const safeCopy = escapeHtml(copyFor(emailData.email_action_type))
+    const safeCode = escapeHtml(emailData.token)
 
     const brevoResponse = await fetch(BREVO_ENDPOINT, {
       method: 'POST',
@@ -96,11 +106,12 @@ Deno.serve(async (request) => {
                 <h1 style="margin:0 0 16px;font-size:32px;line-height:1.1">Your access is ready</h1>
                 <p style="margin:0 0 28px;color:#b8d1d1;font-size:17px;line-height:1.6">${safeCopy}</p>
                 <p style="margin:0 0 28px;color:#b8d1d1;font-size:15px;line-height:1.6">
-                  Open this email on the device where you will use the app. One tap signs you in and takes you directly to Today.
+                  Open this email on the device where you will use the app. Confirm the link in your browser, or enter the code in the installed app.
                 </p>
                 <a href="${safeUrl}" style="display:inline-block;background:#37b8c8;color:#062f35;text-decoration:none;font-weight:700;padding:15px 22px;border-radius:10px">
                   Open Athletic Challenge
                 </a>
+                ${isMagicLink ? `<p style="margin:28px 0 0;color:#b8d1d1;font-size:15px;line-height:1.6">Using the installed app? Enter this code on its sign-in screen: <strong style="color:#eff9f7;font-size:24px;letter-spacing:4px">${safeCode}</strong></p>` : ''}
                 <p style="margin:28px 0 0;color:#82a6a8;font-size:13px;line-height:1.5">
                   This personal link expires and can only be used once. If you did not expect it, you can ignore this email.
                 </p>
@@ -108,7 +119,7 @@ Deno.serve(async (request) => {
             </body>
           </html>
         `,
-        textContent: `${copyFor(emailData.email_action_type)}\n\nOpen this email on the device where you will use the app. One tap signs you in and opens Today.\n\n${verificationUrl.toString()}\n\nThis personal link expires and can only be used once.`,
+        textContent: `${copyFor(emailData.email_action_type)}\n\nOpen the link in your browser and confirm sign-in:\n${verificationUrl.toString()}${isMagicLink ? `\n\nUsing the installed app? Enter this code on its sign-in screen: ${emailData.token}` : ''}\n\nThis ${isMagicLink ? 'link and code expire' : 'link expires'} and can only be used once.`,
         tags: ['supabase-auth', emailData.email_action_type],
       }),
     })

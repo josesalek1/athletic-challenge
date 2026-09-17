@@ -5,7 +5,8 @@ import { createClient } from '@/lib/supabase/client';
 
 export default function Login() {
   const [email, setEmail] = useState('');
-  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [code, setCode] = useState('');
+  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'verifying' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const ready = Boolean(email.trim());
 
@@ -33,7 +34,29 @@ export default function Login() {
       setMessage('The access link could not be sent. Check your email address and try again.');
       return;
     }
+    setMessage('');
     setState('sent');
+  }
+
+  async function verifyCode() {
+    if (!/^\d{6}$/.test(code)) {
+      setMessage('Enter the six-digit code from the email.');
+      return;
+    }
+    setState('verifying');
+    setMessage('');
+    const supabase = createClient();
+    const { error } = await supabase.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token: code,
+      type: 'magiclink',
+    });
+    if (error) {
+      setState('sent');
+      setMessage('The code is invalid or expired. Request a new email and try again.');
+      return;
+    }
+    window.location.replace('/hoy');
   }
 
   return (
@@ -46,14 +69,28 @@ export default function Login() {
         Sign in to your personal tracker with an email link.
       </p>
 
-      {state === 'sent' ? (
+      {state === 'sent' || state === 'verifying' ? (
         <div className="card">
           <p style={{ fontWeight: 600, marginBottom: 6 }}>Check your inbox</p>
           <p className="muted">
-            Open the email on <strong>this same device</strong> and tap the sign-in link.
-            It expires in one hour. Once signed in, install or open Athletic Challenge
-            from that same browser. Your session will stay active for daily use.
+            Enter the six-digit code below to sign in to this installed app.
+            The email link opens the browser and signs in there instead.
           </p>
+          <label htmlFor="access-code">Access code</label>
+          <input id="access-code" type="text" inputMode="numeric" autoComplete="one-time-code"
+            pattern="[0-9]*" maxLength={6} value={code}
+            onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+            onKeyDown={(event) => event.key === 'Enter' && void verifyCode()}
+            placeholder="6-digit code" />
+          <button className="btn-water" style={{ width: '100%', marginTop: 14 }}
+            disabled={state === 'verifying' || code.length !== 6} onClick={verifyCode}>
+            {state === 'verifying' ? 'Signing in…' : 'Sign in with code'}
+          </button>
+          {message && <p className="muted" role="alert" style={{ marginTop: 12, color: 'var(--rope)' }}>{message}</p>}
+          <button className="btn-ghost" style={{ width: '100%', marginTop: 14 }}
+            disabled={state === 'verifying'} onClick={() => { setCode(''); setMessage(''); setState('idle'); }}>
+            Use another email or request a new code
+          </button>
         </div>
       ) : (
         <div className="card">
