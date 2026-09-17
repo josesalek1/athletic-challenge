@@ -5,6 +5,10 @@
 -- El propietario conserva sus entradas, entrenamientos, métricas y vídeos.
 begin;
 
+-- La restricción v13 impide asignar dueño mientras visibility = 'group'.
+-- Se retira antes de convertir ambas columnas en el bloque siguiente.
+alter table public.challenges drop constraint if exists challenges_owner_matches_visibility;
+
 do $$
 declare
   owner_email text := 'jose.salek1@gmail.com';
@@ -48,14 +52,14 @@ create trigger on_auth_user_created
 drop view if exists public.week_board;
 drop trigger if exists entries_sync_group_checkin on public.entries;
 drop function if exists public.sync_group_checkin();
+drop function if exists public.admin_reset_campaign_activity(uuid, text);
+drop function if exists public.admin_reset_all_activity(text);
 drop table if exists public.group_checkins;
 drop function if exists private.challenge_goal_met(text, jsonb, jsonb);
 drop function if exists private.entry_has_progress(text, jsonb, jsonb);
 drop function if exists private.checklist_count(jsonb, jsonb);
 
 drop function if exists public.admin_set_campaign_start(uuid, date, date, text);
-drop function if exists public.admin_reset_campaign_activity(uuid, text);
-drop function if exists public.admin_reset_all_activity(text);
 drop function if exists public.admin_create_campaign(text, text, date, date, boolean);
 drop function if exists public.admin_update_campaign(uuid, text, text, date, date, boolean);
 drop function if exists public.admin_moderate_video(uuid, boolean);
@@ -84,7 +88,6 @@ end;
 $$;
 drop function if exists public.is_admin();
 
-alter table public.challenges drop constraint if exists challenges_owner_matches_visibility;
 alter table public.challenges drop constraint if exists challenges_visibility_check;
 alter table public.challenges drop column if exists visibility;
 alter table public.challenges drop column if exists campaign_id;
