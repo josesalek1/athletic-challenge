@@ -16,7 +16,7 @@ Personal athletic tracker built with Next.js 15, TypeScript, Supabase and Vercel
 
 Existing databases at v16 need only `migration-v17.sql`. For a new database, apply `supabase/schema.sql` and migrations v2 through v16, create the owner Auth account using the allow-list flow, then apply v17.
 
-Before running v17, replace `CHANGE_OWNER_EMAIL` on line 10 with the exact email of the existing owner account. **Review this migration carefully:** it deletes every other Auth account and its personal data through foreign key cascades. It assigns the existing shared challenges and video library to the owner, removes campaigns, roles, memberships and shared check-ins, and rejects new account creation. It does not run automatically from this repository.
+Before running v17, verify the quoted owner email on line 10. In SQL, the address must remain inside single quotes, for example `owner_email text := 'jose.salek1@gmail.com';` with no backslash before `@`. **Review this migration carefully:** it deletes every other Auth account and its personal data through foreign key cascades. It assigns the existing shared challenges and video library to the owner, removes campaigns, roles, memberships and shared check-ins, and rejects new account creation. It does not run automatically from this repository.
 
 Postgres RLS limits profiles, challenges, entries, videos, training, swimming and body metrics to the signed in owner. The frontend does not grant access. The offline sync function checks both `auth.uid()` and challenge ownership.
 

@@ -1,18 +1,15 @@
 -- ATHLETIC CHALLENGE — v17: uso personal.
 -- Ejecutar una sola vez después de migration-v16.sql.
--- IMPORTANTE: sustituir CHANGE_OWNER_EMAIL antes de ejecutar.
+-- Propietario: verificar este correo antes de ejecutar la migración.
 -- Esta migración elimina las otras cuentas de Auth y sus datos por CASCADE.
 -- El propietario conserva sus entradas, entrenamientos, métricas y vídeos.
 begin;
 
 do $$
 declare
-  owner_email text := 'CHANGE_OWNER_EMAIL';
+  owner_email text := 'jose.salek1@gmail.com';
   owner_user_id uuid;
 begin
-  if owner_email = 'CHANGE_OWNER_EMAIL' then
-    raise exception 'Set owner_email in migration-v17.sql before running it.';
-  end if;
   select id into owner_user_id from auth.users where lower(email) = lower(owner_email);
   if owner_user_id is null then
     raise exception 'Owner account % does not exist in auth.users.', owner_email;
