@@ -29,7 +29,7 @@ export default function ConfirmAccess({ tokenHash }: { tokenHash: string }) {
       <div className="card">
         <p className="muted" style={{ marginBottom: 18 }}>
           This link signs you in to this browser. To sign in to the installed app, enter the
-          six-digit code from the same email on its sign-in screen.
+          eight-digit code from the same email on its sign-in screen.
         </p>
         {tokenHash && !error && (
           <button className="btn-water" style={{ width: '100%' }} disabled={busy} onClick={confirm}>

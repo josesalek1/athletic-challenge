@@ -21,7 +21,7 @@ Before running v17, verify the quoted owner email on line 10. In SQL, the addres
 Postgres RLS limits profiles, challenges, entries, videos, training, swimming and body metrics to the signed in owner. The frontend does not grant access. The offline sync function checks both `auth.uid()` and challenge ownership.
 
 Magic link sign in continues to use the existing account. Keep Supabase Email Auth, the production URL and `/auth/callback` redirect configured.
-The updated email hook sends a six-digit code alongside a browser sign-in link. On an installed iPhone web app, request the email from the app and enter the code there. A link opened from Mail signs in to Safari, whose session is separate from an already installed web app. Deploy the updated `supabase/functions/send-auth-email` function together with the new Next.js app before testing this flow. Existing `/auth/callback` links remain supported; new emails use `/auth/confirm`.
+The updated email hook sends an eight-digit code alongside a browser sign-in link. On an installed iPhone web app, request the email from the app and enter the code there. A link opened from Mail signs in to Safari, whose session is separate from an already installed web app. Deploy the updated `supabase/functions/send-auth-email` function together with the new Next.js app before testing this flow. Existing `/auth/callback` links remain supported; new emails use `/auth/confirm`.
 
 The existing Supabase Auth Send Email hook must point to the deployed function. To update it after review, deploy `supabase functions deploy send-auth-email --no-verify-jwt` from this repository, then deploy the Vercel app. Request a fresh email after both deployments; older emails do not contain a code.
 
