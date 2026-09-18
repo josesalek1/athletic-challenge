@@ -703,6 +703,10 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 .nutrition-plan-actions button:disabled { opacity: .5; }
 .nutrition-alternative { padding: 13px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--water) 5%, var(--tile)); }
 .nutrition-alternative h4 { margin-top: 9px; }
+.nutrition-quick-log { margin-top: 17px; padding-top: 15px; border-top: 1px solid var(--line); }
+.nutrition-quick-log textarea { display: block; resize: vertical; }
+.nutrition-quick-log button { width: 100%; margin-top: 9px; }
+.nutrition-quick-status { margin-top: 8px; color: var(--water); font-size: 12px; line-height: 1.4; }
 .nutrition-plan-source { margin-top: 12px; }
 .nutrition-journal-heading { margin-top: 34px; }
 .nutrition-calorie-summary { margin: 0 0 12px; color: var(--mist); font-size: 12px; }

@@ -8,7 +8,7 @@ Personal athletic tracker built with Next.js 15, TypeScript, Supabase and Vercel
 - Daily activities stored as Supabase rows. `kind` selects the timed, reps, checklist or done interface.
 - Personal progress over 7, 14, 30, 60 or 90 days, with trends for activities, strength, swimming and weight.
 - Training plan, workout sets, swimming sessions and body measurements.
-- Personal nutrition plan with breakfast, lunch, snack and dinner options, curated alternatives, and a private food journal. Calories can be entered when known; the app does not estimate them.
+- Personal nutrition plan with breakfast, lunch, snack and dinner options, curated alternatives, quick free-text logging in each meal block, and a private food journal. Calories can be entered when known; the app does not estimate them.
 - Technique library with YouTube, Vimeo and Google Drive links.
 - A WhatsApp report composed in the browser and sent manually by the owner.
 - IndexedDB queue for offline results and training logs. Some screens still require a connection.

@@ -31,6 +31,7 @@ const FOOD_GROUPS: { key: FoodGroup; label: string }[] = [
   { key: 'protein', label: 'Protein' },
   { key: 'dairy_alternatives', label: 'Dairy / alternatives' },
 ];
+const EMPTY_QUICK_MEALS: Record<MealType, string> = { breakfast: '', lunch: '', snack: '', dinner: '' };
 function shiftDay(day: string, offset: number) {
   const date = new Date(`${day}T12:00:00`);
   date.setDate(date.getDate() + offset);
@@ -66,6 +67,8 @@ export default function NutritionJournal({ userId, initialDay }: { userId: strin
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [quickMeals, setQuickMeals] = useState<Record<MealType, string>>(EMPTY_QUICK_MEALS);
+  const [quickMealStatus, setQuickMealStatus] = useState<Partial<Record<MealType, string>>>({});
 
   useEffect(() => {
     const localToday = today();
@@ -138,6 +141,8 @@ export default function NutritionJournal({ userId, initialDay }: { userId: strin
     resetForm();
     setMessage('');
     setPlanMessage('');
+    setQuickMeals(EMPTY_QUICK_MEALS);
+    setQuickMealStatus({});
     setDay(nextDay);
   }
 
@@ -275,6 +280,29 @@ export default function NutritionJournal({ userId, initialDay }: { userId: strin
     setRevision((value) => value + 1);
   }
 
+  async function logQuickMeal(type: MealType) {
+    const cleanName = quickMeals[type].trim();
+    if (!cleanName || busy) return;
+    if (cleanName.length > 120) {
+      setQuickMealStatus((current) => ({ ...current, [type]: 'Keep the description under 120 characters.' }));
+      return;
+    }
+    setBusy(true);
+    setQuickMealStatus((current) => ({ ...current, [type]: '' }));
+    const { error } = await createClient().from('nutrition_meals').insert({
+      user_id: userId, day, meal_type: type, name: cleanName,
+      food_groups: [], note: null, calories_kcal: null,
+    });
+    setBusy(false);
+    if (error) {
+      setQuickMealStatus((current) => ({ ...current, [type]: 'Could not log this meal. Check your connection and try again.' }));
+      return;
+    }
+    setQuickMeals((current) => ({ ...current, [type]: '' }));
+    setQuickMealStatus((current) => ({ ...current, [type]: 'Meal logged.' }));
+    setRevision((value) => value + 1);
+  }
+
   function optionsFor(type: MealType): (PlanIdea & { id?: string })[] {
     const saved = planOptions.filter((option) => option.meal_type === type);
     const savedNames = new Set(saved.map((option) => option.name.toLowerCase()));
@@ -300,12 +328,12 @@ export default function NutritionJournal({ userId, initialDay }: { userId: strin
       <p className="muted nutrition-intro">Choose from your meal options, find an alternative, and record what you actually ate.</p>
 
       <div className="nutrition-day-picker">
-        <button className="btn-ghost" type="button" aria-label="Previous day" onClick={() => selectDay(shiftDay(day, -1))}>←</button>
+        <button className="btn-ghost" type="button" aria-label="Previous day" disabled={busy} onClick={() => selectDay(shiftDay(day, -1))}>←</button>
         <label htmlFor="nutrition-day">Log for
-          <input id="nutrition-day" type="date" max={lastDay} value={day}
+          <input id="nutrition-day" type="date" max={lastDay} value={day} disabled={busy}
             onChange={(event) => { if (event.target.value) selectDay(event.target.value); }} />
         </label>
-        <button className="btn-ghost" type="button" aria-label="Next day" disabled={day >= lastDay}
+        <button className="btn-ghost" type="button" aria-label="Next day" disabled={busy || day >= lastDay}
           onClick={() => selectDay(shiftDay(day, 1))}>→</button>
       </div>
       <p className="nutrition-date-label">{dayLabel(day)}</p>
@@ -348,6 +376,17 @@ export default function NutritionJournal({ userId, initialDay }: { userId: strin
                   <button type="button" disabled={busy} onClick={() => void logPlanOption(alternative)}>Log eaten</button>
                 </div>
               </div>}
+              <form className="nutrition-quick-log" onSubmit={(event) => { event.preventDefault(); void logQuickMeal(type.key); }}>
+                <label htmlFor={`quick-meal-${type.key}`}>Ate something else?</label>
+                <textarea id={`quick-meal-${type.key}`} rows={2} maxLength={120} value={quickMeals[type.key]}
+                  onChange={(event) => {
+                    setQuickMeals((current) => ({ ...current, [type.key]: event.target.value }));
+                    setQuickMealStatus((current) => ({ ...current, [type.key]: '' }));
+                  }}
+                  placeholder="Write what you ate, even at a restaurant" />
+                <button className="btn-water" type="submit" disabled={busy || !quickMeals[type.key].trim()}>{busy ? 'Saving…' : 'Log this meal'}</button>
+                {quickMealStatus[type.key] && <p className="nutrition-quick-status" role="status">{quickMealStatus[type.key]}</p>}
+              </form>
             </section>;
           })}
         </div>
