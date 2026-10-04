@@ -22,8 +22,10 @@ export default async function Training({
   // Sin filtro por usuario: la RLS ya devuelve solo lo tuyo.
   const [{ data: todaySets }, { data: history }, { data: session }, { data: swim }, { data: bodyMetric }] = await Promise.all([
     supabase.from('training_sets').select('*').eq('day', day).eq('slot', slot.key),
+    // El ejercicio, no el nombre histórico de la sesión, define la referencia anterior.
+    // Así el cambio de plan conserva cargas y repeticiones útiles.
     supabase.from('training_sets').select('*').lt('day', day)
-      .eq('slot', slot.key).order('day', { ascending: false }).limit(200),
+      .order('day', { ascending: false }).limit(500),
     supabase.from('training_sessions').select('*').eq('day', day).eq('slot', slot.key).maybeSingle(),
     slot.kind === 'swim'
       ? supabase.from('swim_sessions').select('distance_m, duration_s, stroke, rpe, notes').eq('day', day).maybeSingle()

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { PLAN, PROGRESSION, type Exercise } from '@/lib/plan';
+import { ADJUSTMENTS, PLAN, PLAN_RULES, PROGRESSION, type Exercise } from '@/lib/plan';
 import { mmss } from '@/lib/format';
 import type { BodyMetric } from '@/lib/types';
 import BodyMetricsForm from './BodyMetricsForm';
@@ -25,6 +25,7 @@ type SetRow = {
   weight_kg: number | null;
   reps: number | null;
   seconds: number | null;
+  rir: number | null;
 };
 
 type SwimRow = {
@@ -57,13 +58,14 @@ export default function TrainingDay({
   const supabase = createClient();
   const slot = PLAN.find((s) => s.key === slotKey)!;
 
-  const [sets, setSets] = useState<Record<string, { weight: string; reps: string }>>(() =>
+  const [sets, setSets] = useState<Record<string, { weight: string; reps: string; rir: string }>>(() =>
     Object.fromEntries(
       todaySets.map((s) => [
         `${s.exercise_key}:${s.set_index}`,
         {
           weight: s.weight_kg != null ? String(s.weight_kg) : '',
           reps: s.seconds != null ? String(s.seconds) : s.reps != null ? String(s.reps) : '',
+          rir: s.rir != null ? String(s.rir) : '',
         },
       ])
     )
@@ -93,6 +95,7 @@ export default function TrainingDay({
             {
               weight: set.weight_kg != null ? String(set.weight_kg) : '',
               reps: set.seconds != null ? String(set.seconds) : set.reps != null ? String(set.reps) : '',
+              rir: set.rir != null ? String(set.rir) : '',
             },
           ])),
         }));
@@ -123,10 +126,10 @@ export default function TrainingDay({
   }, [history]);
 
   function field(ex: Exercise, i: number) {
-    return sets[`${ex.key}:${i}`] ?? { weight: '', reps: '' };
+    return sets[`${ex.key}:${i}`] ?? { weight: '', reps: '', rir: '' };
   }
 
-  function update(ex: Exercise, i: number, patch: Partial<{ weight: string; reps: string }>) {
+  function update(ex: Exercise, i: number, patch: Partial<{ weight: string; reps: string; rir: string }>) {
     setSets((s) => ({
       ...s,
       [`${ex.key}:${i}`]: { ...field(ex, i), ...patch },
@@ -137,6 +140,11 @@ export default function TrainingDay({
     const f = field(ex, i);
     if (!f.reps && !f.weight) return;
     const value = Number(f.reps) || null;
+    const rirValue = f.rir === '' ? null : Number(f.rir);
+    if (rirValue !== null && (!Number.isInteger(rirValue) || rirValue < 0 || rirValue > 10)) {
+      alert('RIR must be a whole number from 0 to 10.');
+      return;
+    }
     const mutation = {
       id: `training_set:${userId}:${day}:${slot.key}:${ex.key}:${i}`,
       type: 'training_set' as const,
@@ -148,6 +156,7 @@ export default function TrainingDay({
       weight_kg: ex.noLoad || !f.weight ? null : Number(f.weight),
       reps: ex.timed ? null : value,
       seconds: ex.timed ? value : null,
+      rir: rirValue,
     };
 
     if (!navigator.onLine) {
@@ -165,6 +174,7 @@ export default function TrainingDay({
         weight_kg: mutation.weight_kg,
         reps: mutation.reps,
         seconds: mutation.seconds,
+        rir: mutation.rir,
       }, { onConflict: 'user_id,day,slot,exercise_key,set_index' });
       if (error) {
         if (isNetworkFailure(error)) await queueMutation(mutation);
@@ -266,6 +276,7 @@ export default function TrainingDay({
       <p className="eyebrow">Private · only you</p>
       <h1 className="display" style={{ fontSize: 34, margin: '8px 0 6px' }}>{slot.name}</h1>
       <p className="muted" style={{ marginBottom: 16 }}>{slot.intent}</p>
+      {slot.optional && <p className="training-optional-pill">Optional · only when recovered</p>}
       <Link href="/videos" className="btn btn-ghost" style={{ width: '100%', marginBottom: 16 }}>
         Exercise technique library
       </Link>
@@ -280,6 +291,23 @@ export default function TrainingDay({
         <a href="#body" className="chip">Body</a>
       </div>
 
+      <details className="card training-week-plan">
+        <summary>Weekly plan and adjustment rules</summary>
+        <div className="training-week-list">
+          {PLAN.map((item) => (
+            <div key={item.key} data-current={item.key === slot.key}>
+              <span>{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][item.weekday]}</span>
+              <strong>{item.name}</strong>
+              <small>{item.intent}</small>
+            </div>
+          ))}
+        </div>
+        <ul className="training-rules">
+          {PLAN_RULES.map((rule) => <li key={rule}>{rule}</li>)}
+          {ADJUSTMENTS.map((rule) => <li key={rule}>{rule}</li>)}
+        </ul>
+      </details>
+
       {slot.note && (
         <div className="card" style={{ borderColor: 'var(--rope)' }}>
           <p className="muted">{slot.note}</p>
@@ -290,16 +318,30 @@ export default function TrainingDay({
         <p className="empty">Rest day. Walk, move a little, and eat enough.</p>
       )}
 
+      {slot.kind === 'recovery' && (
+        <div className="card recovery-plan-card">
+          {slot.steps!.map((step) => (
+            <article key={step.block} className="training-plan-step">
+              <div className="between">
+                <div><p className="eyebrow">{step.block}</p><h3>{step.name}</h3></div>
+                <strong className="num">{step.dose}</strong>
+              </div>
+              <p className="muted">{step.cue}</p>
+            </article>
+          ))}
+        </div>
+      )}
+
       {slot.kind === 'swim' && (
         <div className="card swim-log-card">
-          {slot.sets!.map((s) => (
-            <div key={s.label} className="between"
-                 style={{ padding: '11px 0', borderBottom: '1px solid var(--line)' }}>
+          {slot.sets!.map((set) => (
+            <div key={set.block} className="training-plan-step">
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontWeight: 600, fontSize: 14 }}>{s.label}</p>
-                <p className="muted" style={{ marginTop: 2 }}>{s.detail}</p>
+                <p className="eyebrow">{set.block}</p>
+                <p style={{ fontWeight: 600, fontSize: 14, marginTop: 4 }}>{set.name}</p>
+                <p className="muted" style={{ marginTop: 3 }}>{set.dose} · {set.cue}</p>
               </div>
-              <p className="num" style={{ fontSize: 14, color: 'var(--water)' }}>{s.meters} m</p>
+              <p className="num" style={{ fontSize: 14, color: 'var(--water)' }}>{set.meters} m</p>
             </div>
           ))}
           <div className="between" style={{ paddingTop: 12 }}>
@@ -329,12 +371,13 @@ export default function TrainingDay({
           return (
             <div key={ex.key} className="card">
               <div className="between">
-                <p style={{ fontWeight: 600, fontSize: 15, flex: 1, minWidth: 0 }}>{ex.name}</p>
+                <div style={{ flex: 1, minWidth: 0 }}><p className="eyebrow">{ex.block}</p><p style={{ fontWeight: 600, fontSize: 15, marginTop: 4 }}>{ex.name}</p></div>
                 <p className="num" style={{ fontSize: 12, color: 'var(--mist)' }}>
                   {ex.sets} × {ex.reps}{ex.perSide ? '/side' : ''}
                 </p>
               </div>
               <p className="check-hint">{ex.cue}</p>
+              {ex.targetRir && <p className="target-rir num">Target RIR · {ex.targetRir}</p>}
               <details className="movement-guide">
                 <summary>How to do it</summary>
                 <p className="muted">{ex.how}</p>
@@ -346,8 +389,8 @@ export default function TrainingDay({
                   {prev
                     .map((p) =>
                       p.seconds != null
-                        ? mmss(p.seconds)
-                        : `${p.weight_kg ? p.weight_kg + 'kg ' : ''}${p.reps ?? '–'}`
+                        ? `${mmss(p.seconds)}${p.rir != null ? ` @ RIR ${p.rir}` : ''}`
+                        : `${p.weight_kg ? p.weight_kg + 'kg ' : ''}${p.reps ?? '–'}${p.rir != null ? ` @ RIR ${p.rir}` : ''}`
                     )
                     .join('  ')}
                 </p>
@@ -377,6 +420,11 @@ export default function TrainingDay({
                              onChange={(e) => update(ex, i, { reps: e.target.value })}
                              onBlur={() => saveSet(ex, i)}
                              style={{ flex: 1, textAlign: 'right' }} />
+                      <input inputMode="numeric" type="number" min="0" max="10" step="1"
+                             aria-label={`Set ${i} RIR`} placeholder="RIR" value={f.rir}
+                             onChange={(e) => update(ex, i, { rir: e.target.value })}
+                             onBlur={() => saveSet(ex, i)}
+                             style={{ flex: '0 1 72px', textAlign: 'right' }} />
                     </div>
                   );
                 })}

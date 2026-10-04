@@ -69,17 +69,18 @@ export default function BodyMetricsForm({
   return (
     <section className="body-section" id="body" aria-labelledby="body-heading">
       <div className="section-heading body-heading">
-        <div><p className="eyebrow">Body</p><h2 id="body-heading">Daily measurements</h2></div>
+        <div><p className="eyebrow">8-week check</p><h2 id="body-heading">Recomposition measurements</h2></div>
         <span className="privacy-pill">Only you</span>
       </div>
+      <p className="muted body-measurement-guidance">Record three morning weights per week and one waist measurement at navel height. Progress uses the weight trend together with waist, strength, RIR and swim pace.</p>
       <form className="card body-metrics-form" onSubmit={(event) => { event.preventDefault(); void saveBodyMetrics(); }}>
         <div className="body-metrics-fields">
           <div>
-            <label htmlFor="body-weight">Weight · kg</label>
+            <label htmlFor="body-weight">Morning weight · kg</label>
             <input id="body-weight" type="number" inputMode="decimal" min="0.01" max="499.99" step="0.01" required value={weight} onChange={(event) => setWeight(event.target.value)} placeholder="75.20" />
           </div>
           <div>
-            <label htmlFor="body-waist">Waist · cm · optional</label>
+            <label htmlFor="body-waist">Waist at navel · cm · optional</label>
             <input id="body-waist" type="number" inputMode="decimal" min="0.1" max="299.9" step="0.1" value={waist} onChange={(event) => setWaist(event.target.value)} placeholder="82.5" />
           </div>
           <div className="body-note">

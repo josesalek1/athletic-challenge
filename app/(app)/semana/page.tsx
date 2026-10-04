@@ -24,6 +24,7 @@ type TrainingSet = {
   weight_kg: number | null;
   reps: number | null;
   seconds: number | null;
+  rir: number | null;
 };
 
 type SwimSession = {
@@ -131,7 +132,7 @@ export default async function Progress({
     supabase.from('challenges').select('*').eq('active', true).order('sort_order'),
     supabase.from('entries').select('user_id, challenge_id, day, payload'),
     supabase.from('training_sessions').select('day, slot, done, distance_m').gte('day', trendStart),
-    supabase.from('training_sets').select('day, exercise_key, weight_kg, reps, seconds'),
+    supabase.from('training_sets').select('day, exercise_key, weight_kg, reps, seconds, rir'),
     supabase.from('swim_sessions').select('day, distance_m, duration_s, stroke, rpe, notes'),
     supabase.from('body_metrics').select('user_id, day, weight_kg, waist_cm, note').gte('day', trendStart),
   ]);
@@ -323,6 +324,7 @@ export default async function Progress({
     const sessionDays = [...new Set(current.map((set) => set.day))].sort();
     const latestDay = sessionDays.at(-1);
     const latest = current.filter((set) => set.day === latestDay);
+    const latestRirValues = latest.map((set) => set.rir).filter((value): value is number => value != null);
     return {
       key,
       name: exercise?.name ?? key,
@@ -339,6 +341,8 @@ export default async function Progress({
       latestWeight: Math.max(0, ...latest.map((set) => set.weight_kg ?? 0)),
       latestReps: latest.reduce((sum, set) => sum + (set.reps ?? 0), 0),
       latestSeconds: Math.max(0, ...latest.map((set) => set.seconds ?? 0)),
+      latestRir: average(latestRirValues),
+      latestRirCount: latestRirValues.length,
       sessions: sessionDays.length,
     };
   }).sort((a, b) => b.sessions - a.sessions || a.name.localeCompare(b.name));
@@ -388,7 +392,7 @@ export default async function Progress({
       </nav>
           <section className="insight-strip" aria-label="Personal overview">
             <div><strong className="num">{challengeEntryCount}</strong><span>challenge entries<small>one activity on one day</small></span></div>
-            <div><strong className="num">{completedTrainingSessions}</strong><span>completed sessions<small>strength or swimming</small></span></div>
+            <div><strong className="num">{completedTrainingSessions}</strong><span>completed sessions<small>strength, swim or recovery</small></span></div>
             <div><strong className="num">{goalRate}%</strong><span>goals achieved<small>{goalsAchieved} of {challengeEntryCount}</small></span></div>
           </section>
 
@@ -513,6 +517,7 @@ export default async function Progress({
                       <div><span>vs prior 30 days</span><strong className="num">{signedPercent(exercise.change)}</strong></div>
                     </div>
                     <p className="auto-insight">{exercise.trendInsight}</p>
+                    {exercise.latestRirCount > 0 && <div className="record-row"><span>Latest average RIR</span><strong className="num">{exercise.latestRir.toFixed(1)}</strong></div>}
                   </article>
                 ))}
               </div>

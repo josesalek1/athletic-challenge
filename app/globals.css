@@ -625,6 +625,7 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
 
 .body-section { margin-top: 24px; }
 .body-heading { margin-top: 0; }
+.body-measurement-guidance { margin: -8px 0 13px; font-size: 12px; line-height: 1.55; }
 .body-metrics-form { display: grid; gap: 14px; }
 .body-metrics-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .body-note { grid-column: 1 / -1; }
@@ -650,6 +651,21 @@ label { font-family: var(--data); font-size: 11px; letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 .movement-guide p { margin-top: 8px; }
+.training-optional-pill { display: inline-block; margin: -6px 0 14px; padding: 6px 9px; border: 1px solid #e1bb62; border-radius: 999px; color: #e8d39d; font: 9px var(--data); text-transform: uppercase; }
+.training-week-plan summary { color: var(--water); cursor: pointer; font: 11px var(--data); text-transform: uppercase; }
+.training-week-list { display: grid; gap: 7px; margin-top: 14px; }
+.training-week-list div { display: grid; grid-template-columns: 34px 1fr; gap: 2px 9px; padding: 9px; border: 1px solid var(--line); border-radius: 8px; }
+.training-week-list div[data-current='true'] { border-color: var(--water); background: color-mix(in srgb, var(--water) 8%, var(--tile)); }
+.training-week-list span { grid-row: 1 / 3; color: var(--water); font: 9px var(--data); text-transform: uppercase; }
+.training-week-list strong { font-size: 12px; }
+.training-week-list small { color: var(--mist); font-size: 10px; line-height: 1.4; }
+.training-rules { margin: 14px 0 0 18px; color: var(--mist); font-size: 11px; line-height: 1.55; }
+.training-rules li + li { margin-top: 5px; }
+.training-plan-step { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.training-plan-step:last-child { border-bottom: 0; }
+.training-plan-step h3 { margin-top: 4px; font-size: 14px; }
+.training-plan-step > .muted { grid-column: 1 / -1; margin-top: -4px; font-size: 11px; line-height: 1.45; }
+.target-rir { display: inline-block; margin: 1px 0 2px; padding: 5px 8px; border: 1px solid var(--water); border-radius: 999px; color: var(--water); font-size: 9px; }
 
 /* Barra inferior -------------------------------------------- */
 .tabs {

@@ -340,7 +340,7 @@ export default function NutritionJournal({ userId, initialDay }: { userId: strin
 
       <section className="nutrition-plan" aria-labelledby="nutrition-plan-heading">
         <div className="section-heading">
-          <div><p className="eyebrow">Build muscle · limit fat gain</p><h2 id="nutrition-plan-heading">Your meal plan</h2></div>
+          <div><p className="eyebrow">Recomposition · low sodium</p><h2 id="nutrition-plan-heading">Your meal plan</h2></div>
           <button className="btn-ghost" type="button" onClick={() => openPlanEditor()}>Add option</button>
         </div>
         <p className="muted nutrition-plan-intro">Options follow your low-sodium, low-added-sugar starting plan. Use more rice, oats or potatoes around harder sessions. Your saved choices appear first.</p>
@@ -397,14 +397,14 @@ export default function NutritionJournal({ userId, initialDay }: { userId: strin
         <p className="eyebrow">Your starting point · based on 70 kg</p>
         <h2 id="nutrition-targets-heading">Build muscle, keep sodium and added sugar low</h2>
         <div className="nutrition-target-grid">
-          <div><span>Energy</span><strong className="num">2,700–2,900 kcal</strong></div>
+          <div><span>Energy</span><strong>Stable intake · 14 days</strong></div>
           <div><span>Protein</span><strong className="num">130–150 g</strong></div>
-          <div><span>Carbs</span><strong className="num">280–380 g</strong></div>
-          <div><span>Fat</span><strong className="num">65–85 g</strong></div>
+          <div><span>Carbs</span><strong className="num">250–350 g</strong></div>
+          <div><span>Fat</span><strong className="num">60–80 g</strong></div>
           <div><span>Sodium</span><strong className="num">&lt;2,000 mg</strong></div>
           <div><span>Free sugars</span><strong className="num">ideally &lt;25 g</strong></div>
         </div>
-        <p className="metric-explainer">These are the starting targets you supplied. Review your weekly weight trend after 14 days; your plan suggests adding 150–200 kcal/day if gain is below about 0.18–0.35 kg/week. Whole fruit is different from free sugars.</p>
+        <p className="metric-explainer">Start near your current stable intake for 14 days. Keep calories unchanged while waist decreases and strength improves. Adjust by 150–200 kcal only after two consecutive weeks show a clear trend. Whole fruit is different from free sugars.</p>
         <details className="nutrition-plan-guidance">
           <summary>How to use this plan</summary>
           <ul>

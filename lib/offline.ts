@@ -20,7 +20,7 @@ type MutationMeta = {
 
 export type OfflineMutation = MutationMeta & (
   | { type: 'entry'; day: string; challenge_id: string; payload: Payload }
-  | { type: 'training_set'; day: string; slot: string; exercise_key: string; set_index: number; weight_kg: number | null; reps: number | null; seconds: number | null }
+  | { type: 'training_set'; day: string; slot: string; exercise_key: string; set_index: number; weight_kg: number | null; reps: number | null; seconds: number | null; rir: number | null }
   | { type: 'training_session'; day: string; slot: string; done: boolean }
   | { type: 'swim_session'; day: string; distance_m: number | null; duration_s: number | null; stroke: string | null; rpe: number | null; notes: string | null }
 );
